@@ -897,12 +897,54 @@
       ═════════════════════════════════════════════════════════════════ */
       const CATEGORIES = ['Memberships', 'Visits', 'Forms', 'Purchases', 'Contact Info'];
 
+      /* ─────────────────────────────────────────────────────────────────
+         SCOPE INJECTION — verified against the CDP repos on 2026-08-31.
+
+         Child scoping is injected at audience-create time by
+         createConditionWithAccountFilter(), which wraps the author's
+         condition tree in an AND with this leaf prepended
+         (xcs-cdp-audience-api/src/services/audience.service.ts:526-571).
+         The MA API supplies the child UUID as account_filter
+         (xcs-cdp-marketing-automation-api/src/utils/audience_service_utils.py:44-46).
+
+         Note the axis: this scopes WHICH CONTACTS are eligible, by XG
+         account UUID. It does not scope which activity counts, and it is
+         not an MT location ID. No location property exists on any CDP
+         event or aggregate — see PRD §9 Q2 and Q8.
+      ───────────────────────────────────────────────────────────────── */
+      const SCOPE_INJECTION = {
+        /* associated_accounts when the HQ has multi_location_sync enabled,
+           otherwise primary_internal_account_id. */
+        property: 'detail.associated_accounts.internal_account_ids',
+        operator: 'in',
+      };
+
+      /* Tooltip on the injected row's lock. Names the leaf that is actually
+         injected today, and is explicit that the activity-level location match
+         this row depicts is still unresolved. No double quotes — this is
+         interpolated into a title attribute. */
+      function scopeTooltip(tpl) {
+        const injected =
+          `Scoped to this account — injected as ` +
+          `${SCOPE_INJECTION.property} ${SCOPE_INJECTION.operator} [account id]. ` +
+          `This limits which contacts are eligible.`;
+        return tpl.activityLocationProperty
+          ? `${injected} Activity is matched on ${tpl.activityLocationProperty}.`
+          : `${injected} Filtering the activity itself by location is not yet ` +
+            `supported — no location property exists on CDP events or ` +
+            `aggregates (PRD §9 Q2, Q8).`;
+      }
+
       const TEMPLATES = {
         membership: {
           category: 'Memberships',
           name: 'Has a Membership - CDP',
-          /* Which JSONB property carries location for this condition (PRD §9 Q2) */
-          locationProperty: 'detail.traits.purchase_location_id',
+          /* PRD §9 Q2: the per-condition activity location property this row
+             would ideally match on. Verified as NOT EXISTING in any CDP repo —
+             there is no aggregate.properties.*location* path, and membership is
+             a trait (detail.traits.has_membership), not an aggregate. Blocked
+             on PRD §9 Q8 / a Mariana Tek payload change. */
+          activityLocationProperty: null,
           locationLabel: 'and purchase location',
           steps: [
             { id: 'has_membership', type: 'existence', prefix: 'person', suffix: 'a membership', value: 'has' },
@@ -917,7 +959,9 @@
         visits: {
           category: 'Visits',
           name: 'Milestone Visits - CDP',
-          locationProperty: 'detail.traits.visit_location_id',
+          /* PRD §9 Q2: aggregate.category marianatek.reservation is verified, but
+             no location property on its aggregate properties was found. */
+          activityLocationProperty: null,
           locationLabel: 'and at location',
           steps: [
             { id: 'class_check_in_count', type: 'count', prefix: 'person completed', suffix: 'milestone visits', operator: 'greater than or equal to', count: 3 },
@@ -931,7 +975,11 @@
         forms: {
           category: 'Forms',
           name: 'Filled Out a Form - CDP',
-          locationProperty: 'detail.traits.internal_account_id',
+          /* PRD §9 Q2: the forms pipeline does populate
+             event.properties.internal_account_id, but it holds an XG account
+             UUID rather than an MT location, and no condition template reads
+             it — forms conditions filter on event.properties.form_uuid. */
+          activityLocationProperty: null,
           locationLabel: 'and form belongs to',
           steps: [
             { id: 'form_submission', type: 'existence', prefix: 'person', suffix: 'filled out a form', value: 'has' },
@@ -1186,7 +1234,7 @@
               size: 'xs',
               iconOnly: true,
               disabled: true,
-              attrs: `title="Scoped to this account's connected Mariana Tek location — matched on ${tpl.locationProperty}"`,
+              attrs: `title="${scopeTooltip(tpl)}"`,
             }),
           });
         }

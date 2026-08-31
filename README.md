@@ -87,6 +87,26 @@ otherwise unchanged.
 - Skeleton, error and toast states are not exercised, since nothing here is loading over a network.
 - Draft cards resolve to a preset template on click rather than presenting real category/condition
   lists.
+- `.count-field-input` is set to `6.5rem`, which is the **one invented metric** in the builder CSS.
+  `ConditionFields/CountField.vue` renders its `ApolloInput` with no width rule, so the real width
+  is whatever Apollo's input defaults to — not verifiable without a build. Every other value in
+  layers 1 and 2 is transcribed from source.
+
+### Fidelity audit — 2026-08-31
+
+Re-checked layers 1 and 2 against XHB source, then measured the rendered result in headless Chrome.
+`XcsHorizontalBuilder.vue`, `ConditionCard.css`, `ConditionCard.vue`, all five `ConditionFields/*`,
+`ConditionSelector.vue`, `ConfrimPopover.vue` and `ReadOnlyExternalCriteria.vue` match. Computed
+widths land exactly on their source values — select `13.75rem`, count operator `12.5rem`, timeframe
+`13rem` / `9rem` / `5rem`, multiselect inclusion `13.75rem`, Add filter `44px`,
+`--uia-field-label-height` `34px` — and the nested-`<button>` constraint holds at zero. The only
+gap is the `.count-field-input` width noted above.
+
+Two XHB rules are intentionally not reproduced, both artefacts of Stencil hosts that this prototype
+has no equivalent for: `.uia-field-controls :deep(xpl-button) { min-width: unset }` (defensive —
+Apollo's `style.css` sets no button `min-width`) and `.condition-card-actions xpl-button
+{ display: block; line-height: 1 }` (normalises the custom-element host; the prototype's buttons sit
+in an `inline-flex` row and take no baseline gap).
 
 ## Account-scoping design
 
@@ -97,7 +117,7 @@ invented in the component library.
 |------------|----------------|
 | **HQ scope indicator** | `xpl-badge` with a globe icon in `.condition-card-header`, between `.rule-title` and `.condition-card-actions`: "Evaluating across all locations" |
 | **Child scope indicator** | same slot, teal `xpl-badge` with a location pin: "At this location" |
-| **Injected location scope** | an ordinary `.uia-condition-row` — a disabled multiselect step whose chip is teal and non-removable, whose tree connectors are teal instead of `gray-500`, and whose `.uia-field-controls` slot carries a disabled lock button where an optional step would carry a trash button. The lock's tooltip names the JSONB property being matched. |
+| **Injected location scope** | an ordinary `.uia-condition-row` — a disabled multiselect step whose chip is teal and non-removable, whose tree connectors are teal instead of `gray-500`, and whose `.uia-field-controls` slot carries a disabled lock button where an optional step would carry a trash button. The lock's tooltip names the leaf that is actually injected today and flags what is still unresolved (see Open questions). |
 | **HQ-pushed, unlocked** | `ReadOnlyExternalCriteria` panel inside the card, yellow variant, `Scope locked` badge. Steps stay editable and Add filter still works; no location step is injected. |
 | **HQ-pushed, locked** | the same panel in its published indigo form with the `Read only` badge; every select and input disabled, Reset/Remove hidden, Add filter row omitted, Save and Add New Condition disabled. |
 
@@ -114,13 +134,28 @@ invented in the component library.
 - The scope badge is removed at HQ once a marketer adds their own location filter, so the badge never
   contradicts the rule (interaction described in the PRD, not prototyped).
 
-### Open questions this prototype does not answer
+### Open questions — status after the 2026-08-31 verification pass
 
-Tracked in PRD §9 and surfaced here only as tooltip text on the lock control:
+The placeholders that used to sit here were checked against the CDP repos. Two are resolved, one
+had a false premise, and the pass surfaced a new blocking question. Full evidence and citations are
+in PRD §9.
 
-- **Q1** — where the location filter is injected in the pipeline.
-- **Q2** — the exact JSONB property per condition. The values shown
+- **Q1 — resolved.** The filter is injected at audience-create time by
+  `createConditionWithAccountFilter()` in `xcs-cdp-audience-api`, from an `account_filter` the MA API
+  sets when the account has a parent. This is already the shipped pattern for HQ/child audiences, so
+  the prototype's "injected, non-removable step" model matches how the platform really behaves.
+- **Q2 — premise was wrong.** The three properties this prototype used to name
   (`detail.traits.purchase_location_id`, `detail.traits.visit_location_id`,
-  `detail.traits.internal_account_id`) are placeholders pending verification against MT payloads.
-- **Q3** — OR semantics when a child account has several linked MT locations. The prototype shows a
-  single location chip; a multi-location account would show several in the same chip list.
+  `detail.traits.internal_account_id`) **do not exist**, and neither does any
+  `aggregate.properties.*location*` path. The lock tooltip now names the leaf that is genuinely
+  injected — `detail.associated_accounts.internal_account_ids in [account id]` — and says plainly
+  that activity-level location filtering is unavailable.
+- **Q3 — resolved.** `marianatek:{accountId}:linkedLocations` is real: a Redis SET of numeric MT
+  location IDs, mirrored in a `linked_locations` table keyed `(account_id, location_id)`. Multiple
+  locations per account are supported and `IN`/OR is the established semantic. There is no reliable
+  "primary" location, so the single-chip rendering here is the common case rather than the rule — a
+  multi-location account would show several chips in the same list.
+- **Q8 — new, blocking.** CDP can scope *which contacts are eligible*, not *which activity counts*.
+  The injected row in this prototype is drawn as a location match on the activity, which the engine
+  cannot do today. Until Q8 is settled, read that row as depicting intent rather than current
+  behaviour — and note that "At this location" overclaims if scoping stays contact-level.
