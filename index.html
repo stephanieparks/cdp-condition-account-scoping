@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CDP Conditions — Account Scoping (HQ vs Child)</title>
+    <link rel="stylesheet" href="apollo-tokens.css" />
+    <style>
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--xpl-color-gray-50);
+        font-family: var(--xpl-font-family-default);
+        color: var(--xpl-color-gray-900);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Harness ── */
+      .harness {
+        background: var(--xpl-color-gray-1100);
+        color: #fff;
+        padding: 1rem 2.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+      }
+      .harness-copy { flex: 1; min-width: 18rem; }
+      .harness h1 { font-size: 0.9375rem; font-weight: 600; margin: 0; }
+      .harness p {
+        margin: 0.25rem 0 0;
+        font-size: 0.8125rem;
+        color: var(--xpl-color-gray-500);
+        max-width: 44rem;
+        line-height: 1.45;
+      }
+
+      .harness-controls { display: flex; flex-direction: column; gap: 0.625rem; align-items: flex-end; }
+      .harness-label { font-size: 0.75rem; font-weight: 500; color: var(--xpl-color-gray-500); letter-spacing: 0.04em; text-transform: uppercase; }
+
+      .pill-tabs {
+        display: flex;
+        gap: 0.25rem;
+        background: rgb(255 255 255 / 8%);
+        padding: 0.25rem;
+        border-radius: var(--xpl-border-radius-full);
+      }
+      .pill-tabs button {
+        font-family: inherit;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--xpl-color-gray-400);
+        background: transparent;
+        border: 0;
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.375rem 0.875rem;
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+      }
+      .pill-tabs button[aria-selected='true'] {
+        background: #fff;
+        color: var(--xpl-color-gray-1100);
+      }
+
+      /* ── Account context bar ── */
+      .account-context {
+        padding: 0.625rem 2.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.875rem;
+        font-size: 0.8125rem;
+        border-bottom: 1px solid var(--xpl-color-gray-300);
+        background: #fff;
+      }
+      .account-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-weight: 600;
+        font-size: 0.75rem;
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.1875rem 0.625rem;
+      }
+      .account-badge--hq {
+        background: var(--xpl-color-purple-100);
+        color: var(--xpl-color-purple-800);
+      }
+      .account-badge--child {
+        background: var(--xpl-color-teal-100);
+        color: var(--xpl-color-teal-800);
+      }
+      .account-name { font-weight: 500; color: var(--xpl-color-gray-900); }
+      .account-meta { color: var(--xpl-color-gray-600); }
+
+      /* ── Condition tabs strip ── */
+      .condition-strip {
+        padding: 1rem 2.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .condition-strip-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--xpl-color-gray-600);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-right: 0.25rem;
+      }
+      .tab-chip {
+        font-family: inherit;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        background: #fff;
+        color: var(--xpl-color-gray-700);
+        border: 1px solid var(--xpl-color-gray-400);
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.3125rem 0.875rem;
+        cursor: pointer;
+        transition: background 100ms, border-color 100ms, color 100ms;
+      }
+      .tab-chip[aria-selected='true'] {
+        background: var(--xpl-color-purple-700);
+        color: #fff;
+        border-color: var(--xpl-color-purple-700);
+      }
+
+      /* Child-specific sub-tabs */
+      .view-mode-strip {
+        padding: 0.625rem 2.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .view-mode-strip-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--xpl-color-gray-500);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-right: 0.25rem;
+      }
+      .view-chip {
+        font-family: inherit;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        background: transparent;
+        color: var(--xpl-color-gray-600);
+        border: 1px solid transparent;
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.3125rem 0.875rem;
+        cursor: pointer;
+        transition: all 100ms;
+      }
+      .view-chip[aria-selected='true'] {
+        background: var(--xpl-color-gray-200);
+        color: var(--xpl-color-gray-900);
+        border-color: var(--xpl-color-gray-400);
+      }
+
+      /* ── Builder area ── */
+      .builder-route {
+        padding: 1.25rem 2.5rem 3rem;
+        max-width: 80rem;
+      }
+      .builder-route-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      .segment-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0;
+        color: var(--xpl-color-gray-1100);
+      }
+      .segment-header-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .btn {
+        font-family: inherit;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.25rem;
+        padding: 0.5rem 1rem;
+        border-radius: var(--xpl-border-radius-full);
+        border: 1px solid transparent;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn--primary { background: var(--xpl-color-purple-700); color: #fff; border-color: var(--xpl-color-purple-700); }
+      .btn--secondary { background: #fff; color: var(--xpl-color-gray-900); border-color: var(--xpl-color-gray-400); }
+      .btn--xs { font-size: 0.8125rem; font-weight: 500; padding: 0.3125rem 0.875rem; color: var(--xpl-color-gray-800); }
+      .btn--ghost { background: transparent; border-color: transparent; color: var(--xpl-color-gray-600); }
+      .btn--ghost:hover { background: var(--xpl-color-gray-100); }
+
+      /* ── Condition card ── */
+      .condition-builder-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .and-divider {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: var(--xpl-color-gray-600);
+        font-size: 0.8125rem;
+        font-weight: 600;
+      }
+      .and-divider::before, .and-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--xpl-color-gray-300);
+      }
+
+      .condition-builder-card {
+        background: #fff;
+        border: 1px solid var(--xpl-color-gray-400);
+        border-radius: 0.625rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        overflow: hidden;
+      }
+      .condition-builder-card.is-locked {
+        border-color: var(--xpl-color-gray-400);
+      }
+
+      .condition-card-header {
+        display: flex;
+        align-items: center;
+        padding: 0.875rem 1rem 0.875rem 1rem;
+        border-bottom: 1px solid var(--xpl-color-gray-200);
+        gap: 0.75rem;
+      }
+      .rule-title {
+        font-weight: 500;
+        font-size: 0.875rem;
+        display: inline-flex;
+        gap: 0.625rem;
+        align-items: center;
+      }
+      .rule-title .category-name { color: var(--xpl-color-gray-500); font-weight: 400; }
+      .vertical-divider { width: 1px; height: 0.875rem; background: var(--xpl-color-gray-400); }
+      .condition-card-actions { margin-left: auto; display: inline-flex; gap: 0.25rem; }
+
+      /* ── Scope indicator (HQ) ── */
+      .scope-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--xpl-color-purple-700);
+        background: var(--xpl-color-purple-50);
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.2rem 0.625rem 0.2rem 0.375rem;
+        flex-shrink: 0;
+        border: 1px solid var(--xpl-color-purple-200);
+      }
+      .scope-indicator svg { flex-shrink: 0; }
+
+      /* ── Location label (child) ── */
+      .location-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--xpl-color-teal-700);
+        background: var(--xpl-color-teal-50);
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.2rem 0.625rem 0.2rem 0.375rem;
+        flex-shrink: 0;
+        border: 1px solid var(--xpl-color-teal-200);
+      }
+      .location-label svg { flex-shrink: 0; }
+
+      /* ── Locked from HQ banner ── */
+      .locked-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.625rem;
+        padding: 0.625rem 1rem;
+        background: var(--xpl-color-gray-50);
+        border-bottom: 1px solid var(--xpl-color-gray-200);
+        font-size: 0.8125rem;
+        color: var(--xpl-color-gray-700);
+      }
+      .locked-banner svg { flex-shrink: 0; margin-top: 1px; color: var(--xpl-color-gray-600); }
+      .locked-banner strong { color: var(--xpl-color-gray-900); }
+      .locked-banner .locked-scope-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        background: var(--xpl-color-purple-50);
+        color: var(--xpl-color-purple-700);
+        border: 1px solid var(--xpl-color-purple-200);
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.125rem 0.5rem 0.125rem 0.375rem;
+        margin-left: 0.25rem;
+        vertical-align: middle;
+      }
+
+      /* ── HQ-from banner (unlocked-push) ── */
+      .hq-from-banner {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: var(--xpl-color-amber-50, #fffbeb);
+        border-bottom: 1px solid var(--xpl-color-amber-200, #fde68a);
+        font-size: 0.75rem;
+        color: var(--xpl-color-amber-800, #92400e);
+      }
+      .hq-from-banner svg { flex-shrink: 0; color: var(--xpl-color-amber-600, #d97706); }
+
+      /* ── Step rows ── */
+      .condition-steps-area { padding: 0.75rem 1rem 0.875rem; display: flex; flex-direction: column; gap: 0; }
+      .uia-condition-steps {
+        --uia-field-label-height: 34px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        align-items: start;
+        font-size: 0.875rem;
+        position: relative;
+        width: 100%;
+      }
+      .uia-condition-row {
+        display: flex;
+        gap: 0.75rem;
+        width: 100%;
+        position: relative;
+        padding: 0.5rem 0 0.5rem 1.875rem;
+      }
+      .uia-condition-row::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0;
+        width: 1px; height: 100%;
+        background: var(--xpl-color-gray-400);
+      }
+      .uia-condition-row::after {
+        content: '';
+        position: absolute;
+        left: 0; top: var(--uia-field-label-height);
+        width: 1rem; height: 1px;
+        background: var(--xpl-color-gray-400);
+      }
+      .uia-condition-row:last-child::before { height: var(--uia-field-label-height); }
+
+      .uia-field-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        white-space: nowrap;
+        align-self: start;
+        padding-top: 0.8rem;
+        flex-shrink: 0;
+        color: var(--xpl-color-gray-700);
+      }
+      .uia-field-input {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.625rem;
+        align-items: center;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .xpl-select, .xpl-input {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.625rem;
+        height: 2.5rem;
+        padding: 0 0.75rem;
+        font-size: 0.875rem;
+        color: var(--xpl-color-gray-900);
+        background: #fff;
+        border: 1px solid var(--xpl-color-gray-400);
+        border-radius: 0.5rem;
+        flex-shrink: 0;
+        font-family: inherit;
+      }
+      .xpl-select { cursor: pointer; }
+      .xpl-select.is-disabled, .xpl-input.is-disabled {
+        background: var(--xpl-color-gray-100);
+        color: var(--xpl-color-gray-500);
+        border-color: var(--xpl-color-gray-300);
+        cursor: default;
+        pointer-events: none;
+      }
+      .xpl-select svg { color: var(--xpl-color-gray-600); flex-shrink: 0; }
+      .xpl-select--operator { width: 10rem; }
+      .xpl-select--status { width: 9rem; }
+      .xpl-select--multi { min-width: 12rem; flex: 1; justify-content: flex-start; gap: 0.375rem; }
+
+      /* ── Chips ── */
+      .xpl-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        background: var(--xpl-color-gray-100);
+        color: var(--xpl-color-gray-800);
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.125rem 0.5rem;
+      }
+      .xpl-chip-remove {
+        background: none;
+        border: 0;
+        padding: 0;
+        line-height: 1;
+        cursor: pointer;
+        color: var(--xpl-color-gray-500);
+        display: flex;
+      }
+      .xpl-chip-remove.is-locked { display: none; }
+
+      /* ── Location chip (auto-injected, locked) ── */
+      .location-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        background: var(--xpl-color-teal-50);
+        color: var(--xpl-color-teal-800);
+        border: 1px solid var(--xpl-color-teal-200);
+        border-radius: var(--xpl-border-radius-full);
+        padding: 0.125rem 0.5rem 0.125rem 0.375rem;
+      }
+      .location-chip svg { color: var(--xpl-color-teal-600); }
+
+      /* ── Add filter button ── */
+      .add-filter-row {
+        display: flex;
+        align-items: center;
+        padding: 0.375rem 0 0 1.875rem;
+      }
+      .add-filter-btn {
+        font-family: inherit;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        background: transparent;
+        color: var(--xpl-color-purple-700);
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .add-filter-btn:hover { text-decoration: underline; }
+      .add-filter-btn.is-locked {
+        color: var(--xpl-color-gray-400);
+        cursor: default;
+        pointer-events: none;
+      }
+
+      /* ── Add new condition ── */
+      .add-condition-row { display: flex; align-items: center; margin-top: 0.25rem; }
+      .add-condition-btn {
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 500;
+        background: #fff;
+        color: var(--xpl-color-gray-700);
+        border: 1px dashed var(--xpl-color-gray-400);
+        border-radius: 0.625rem;
+        padding: 0.625rem 1rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        width: 100%;
+        transition: background 100ms, border-color 100ms;
+      }
+      .add-condition-btn:hover { background: var(--xpl-color-gray-50); border-color: var(--xpl-color-gray-500); }
+      .add-condition-btn.is-locked { opacity: 0.5; pointer-events: none; }
+
+      /* ── State callout ── */
+      .state-callout {
+        padding: 0.75rem 2.5rem 0;
+        max-width: 80rem;
+      }
+      .callout-box {
+        background: var(--xpl-color-gray-100);
+        border: 1px solid var(--xpl-color-gray-300);
+        border-radius: 0.5rem;
+        padding: 0.625rem 0.875rem;
+        font-size: 0.8125rem;
+        color: var(--xpl-color-gray-700);
+        line-height: 1.5;
+      }
+      .callout-box strong { color: var(--xpl-color-gray-900); }
+
+      /* ── Icon helpers ── */
+      svg { display: inline-block; vertical-align: middle; }
+
+      /* ── Visibility helpers ── */
+      [data-show] { display: none !important; }
+      [data-show].is-visible { display: flex !important; }
+      .block-show { display: none !important; }
+      .block-show.is-visible { display: block !important; }
+    </style>
+  </head>
+
+  <body>
+
+    <!-- ════════════════════════════════════════════
+         HARNESS
+    ════════════════════════════════════════════ -->
+    <div class="harness">
+      <div class="harness-copy">
+        <h1>CDP Conditions — Account Scoping</h1>
+        <p>
+          Explores how HQ and child accounts experience the same CDP conditions. At HQ, conditions evaluate tenant-wide; at child accounts, evaluation is automatically scoped to connected MT locations.
+        </p>
+      </div>
+      <div class="harness-controls">
+        <span class="harness-label">Account context</span>
+        <div class="pill-tabs" role="tablist" id="account-tabs">
+          <button role="tab" aria-selected="true" data-account="hq" onclick="switchAccount('hq')">
+            HQ — Momentum Fitness
+          </button>
+          <button role="tab" aria-selected="false" data-account="child" onclick="switchAccount('child')">
+            Studio A — Mission District
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         ACCOUNT CONTEXT BAR
+    ════════════════════════════════════════════ -->
+    <div class="account-context">
+      <!-- HQ context -->
+      <span id="hq-account-display" data-show class="is-visible" style="display:flex !important; align-items:center; gap:0.75rem;">
+        <span class="account-badge account-badge--hq">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="6" r="2" fill="currentColor"/></svg>
+          HQ
+        </span>
+        <span class="account-name">Momentum Fitness</span>
+        <span class="account-meta">·&nbsp;12 connected locations &nbsp;·&nbsp; Tenant-wide CDP access</span>
+      </span>
+      <!-- Child context -->
+      <span id="child-account-display" data-show style="display:none !important; align-items:center; gap:0.75rem;">
+        <span class="account-badge account-badge--child">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="3.5" width="9" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M4 3.5V3a2 2 0 114 0v.5" stroke="currentColor" stroke-width="1.5"/></svg>
+          Studio
+        </span>
+        <span class="account-name">Studio A — Mission District</span>
+        <span class="account-meta">·&nbsp;1 connected location (MT ID: loc_2847) &nbsp;·&nbsp; Location-scoped CDP access</span>
+      </span>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         CONDITION TYPE TABS
+    ════════════════════════════════════════════ -->
+    <div class="condition-strip">
+      <span class="condition-strip-label">Condition</span>
+      <button class="tab-chip" aria-selected="true" onclick="switchCondition('membership')" data-condition="membership">Has a Membership</button>
+      <button class="tab-chip" aria-selected="false" onclick="switchCondition('visits')" data-condition="visits">Number of Visits</button>
+      <button class="tab-chip" aria-selected="false" onclick="switchCondition('forms')" data-condition="forms">Filled Out a Generic Form</button>
+    </div>
+
+    <!-- Child-only: view mode sub-tabs -->
+    <div class="view-mode-strip" id="child-view-modes" style="display:none;">
+      <span class="view-mode-strip-label">View</span>
+      <button class="view-chip" aria-selected="true" onclick="switchViewMode('local')" data-viewmode="local">My Segment</button>
+      <button class="view-chip" aria-selected="false" onclick="switchViewMode('hq-unlocked')" data-viewmode="hq-unlocked">HQ-Pushed (Unlocked)</button>
+      <button class="view-chip" aria-selected="false" onclick="switchViewMode('hq-locked')" data-viewmode="hq-locked">HQ-Pushed (Locked)</button>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         STATE CALLOUT
+    ════════════════════════════════════════════ -->
+    <div class="state-callout">
+      <!-- HQ callout -->
+      <div id="callout-hq" class="callout-box block-show is-visible">
+        <strong>HQ view:</strong> Each condition card shows a scope indicator — "Evaluating across all locations" — so the marketer knows their segment pulls from the full brand's CDP data. The indicator disappears if they add a location filter manually.
+      </div>
+      <!-- Child: local callout -->
+      <div id="callout-child-local" class="callout-box block-show">
+        <strong>Child account, locally authored:</strong> The condition automatically scopes to Studio A's connected MT location (loc_2847). The "At this location" badge on the card communicates scope. The child user can add additional filters to narrow further, but cannot change to tenant-wide.
+      </div>
+      <!-- Child: hq-unlocked callout -->
+      <div id="callout-child-hq-unlocked" class="callout-box block-show">
+        <strong>Child account, HQ-pushed (unlocked):</strong> This condition was authored at HQ and evaluates tenant-wide. The child can see it and add allowed filters, but cannot change the evaluation scope. A "From HQ" banner distinguishes it from locally authored conditions.
+      </div>
+      <!-- Child: hq-locked callout -->
+      <div id="callout-child-hq-locked" class="callout-box block-show">
+        <strong>Child account, HQ-pushed (locked):</strong> This condition is fully locked by HQ. The child can read it but cannot interact with it. A locked banner explicitly states that it evaluates across all locations, so there is no ambiguity about what the condition is doing.
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         BUILDER AREA
+    ════════════════════════════════════════════ -->
+    <div class="builder-route">
+      <div class="builder-route-header">
+        <h2 class="segment-title">
+          <span id="segment-title-text">Win-back — No Active Membership</span>
+        </h2>
+        <div class="segment-header-actions">
+          <button class="btn btn--secondary" id="edit-btn">Edit</button>
+          <button class="btn btn--primary" id="save-btn">Save segment</button>
+        </div>
+      </div>
+
+      <div class="condition-builder-container">
+
+        <!-- ═══════════════════════════════
+             CARD: Has a Membership
+        ═══════════════════════════════ -->
+        <div id="card-membership" class="condition-builder-card">
+
+          <!-- Card header -->
+          <div class="condition-card-header">
+            <div class="rule-title">
+              <span class="category-name">Memberships</span>
+              <span class="vertical-divider"></span>
+              <span>Has a Membership</span>
+            </div>
+
+            <!-- HQ scope indicator -->
+            <span id="membership-scope-hq" class="scope-indicator" data-show style="display:none;">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><ellipse cx="8" cy="8" rx="2.6" ry="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 8h13" stroke="currentColor" stroke-width="1.4"/></svg>
+              Evaluating across all locations
+            </span>
+
+            <!-- Child location label -->
+            <span id="membership-location-child" class="location-label" style="display:none;">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6c0-2.49-2.01-4.5-4.5-4.5z" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="6" r="1.5" fill="currentColor"/></svg>
+              At this location
+            </span>
+
+            <div class="condition-card-actions" id="membership-card-actions">
+              <button class="btn btn--xs btn--ghost" id="membership-reset-btn" title="Reset condition">Reset</button>
+              <button class="btn btn--xs btn--ghost" id="membership-remove-btn" title="Remove condition" style="color:var(--xpl-color-red-600);">✕</button>
+            </div>
+          </div>
+
+          <!-- Locked banner (child, locked from HQ) -->
+          <div class="locked-banner" id="membership-locked-banner" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="7" width="11" height="8" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="11" r="1" fill="currentColor"/></svg>
+            <div>
+              <strong>Set by Momentum Fitness HQ</strong> — This condition cannot be edited.
+              <span class="locked-scope-badge">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.4"/><ellipse cx="6" cy="6" rx="2" ry="5" stroke="currentColor" stroke-width="1.4"/><path d="M1 6h10" stroke="currentColor" stroke-width="1.4"/></svg>
+                Evaluating across all locations
+              </span>
+            </div>
+          </div>
+
+          <!-- HQ-from banner (child, unlocked push) -->
+          <div class="hq-from-banner" id="membership-hq-from-banner" style="display:none;">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5v4M8 10.5v1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span><strong>From Momentum Fitness HQ</strong> — Evaluation scope is set to tenant-wide and cannot be changed. Additional filters allowed.</span>
+          </div>
+
+          <!-- Step rows -->
+          <div class="condition-steps-area">
+            <div class="uia-condition-steps">
+
+              <!-- Row 1: person has/has not a membership -->
+              <div class="uia-condition-row">
+                <span class="uia-field-label">person</span>
+                <div class="uia-field-input">
+                  <div class="xpl-select xpl-select--operator" id="membership-polarity">
+                    has
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <span class="uia-field-suffix" style="font-size:0.875rem; color:var(--xpl-color-gray-800);">a membership with status</span>
+                  <div class="xpl-select xpl-select--status" id="membership-status">
+                    active
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Row 2: optional — type filter (shown to demonstrate add filter) -->
+              <div class="uia-condition-row" id="membership-type-row" style="display:none;">
+                <span class="uia-field-label">and type</span>
+                <div class="uia-field-input">
+                  <div class="xpl-select xpl-select--operator">
+                    any of the following
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="xpl-select xpl-select--multi" id="membership-type-chips">
+                    <span class="xpl-chip">Unlimited Yoga <button class="xpl-chip-remove" id="membership-type-chip-remove">×</button></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Row 3: auto-injected location (child only, not HQ-pushed) -->
+              <div class="uia-condition-row" id="membership-location-row" style="display:none;">
+                <span class="uia-field-label" style="color:var(--xpl-color-teal-700);">and purchase location</span>
+                <div class="uia-field-input">
+                  <span class="location-chip">
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M6 1C4.07 1 2.5 2.57 2.5 4.5c0 2.81 3.5 6.5 3.5 6.5S9.5 7.31 9.5 4.5C9.5 2.57 7.93 1 6 1z" stroke="currentColor" stroke-width="1.3"/><circle cx="6" cy="4.5" r="1" fill="currentColor"/></svg>
+                    Studio A — Mission District
+                  </span>
+                  <span style="font-size:0.75rem; color:var(--xpl-color-gray-500); font-style:italic;">Auto-applied · cannot be removed</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Add filter -->
+            <div class="add-filter-row">
+              <button class="add-filter-btn" id="membership-add-filter" onclick="toggleMembershipTypeRow()">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Add filter
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── AND divider + second card (always visible) ─── -->
+        <div class="and-divider">AND</div>
+
+        <!-- ═══════════════════════════════
+             CARD: Number of Visits  (or  Filled Out a Form)
+        ═══════════════════════════════ -->
+        <div id="card-visits" class="condition-builder-card">
+
+          <div class="condition-card-header">
+            <div class="rule-title">
+              <span class="category-name">Visits</span>
+              <span class="vertical-divider"></span>
+              <span>Number of Visits</span>
+            </div>
+
+            <!-- HQ scope indicator -->
+            <span id="visits-scope-hq" class="scope-indicator" data-show style="display:none;">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><ellipse cx="8" cy="8" rx="2.6" ry="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 8h13" stroke="currentColor" stroke-width="1.4"/></svg>
+              Evaluating across all locations
+            </span>
+
+            <!-- Child location label -->
+            <span id="visits-location-child" class="location-label" style="display:none;">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6c0-2.49-2.01-4.5-4.5-4.5z" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="6" r="1.5" fill="currentColor"/></svg>
+              At this location
+            </span>
+
+            <div class="condition-card-actions" id="visits-card-actions">
+              <button class="btn btn--xs btn--ghost" id="visits-reset-btn">Reset</button>
+              <button class="btn btn--xs btn--ghost" id="visits-remove-btn" style="color:var(--xpl-color-red-600);">✕</button>
+            </div>
+          </div>
+
+          <!-- Locked banner (child) -->
+          <div class="locked-banner" id="visits-locked-banner" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="7" width="11" height="8" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="11" r="1" fill="currentColor"/></svg>
+            <div>
+              <strong>Set by Momentum Fitness HQ</strong> — This condition cannot be edited.
+              <span class="locked-scope-badge">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.4"/><ellipse cx="6" cy="6" rx="2" ry="5" stroke="currentColor" stroke-width="1.4"/><path d="M1 6h10" stroke="currentColor" stroke-width="1.4"/></svg>
+                Evaluating across all locations
+              </span>
+            </div>
+          </div>
+
+          <!-- HQ-from banner -->
+          <div class="hq-from-banner" id="visits-hq-from-banner" style="display:none;">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5v4M8 10.5v1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span><strong>From Momentum Fitness HQ</strong> — Evaluation scope is set to tenant-wide and cannot be changed. Additional filters allowed.</span>
+          </div>
+
+          <div class="condition-steps-area">
+            <div class="uia-condition-steps">
+
+              <!-- Row 1: count -->
+              <div class="uia-condition-row">
+                <span class="uia-field-label">person</span>
+                <div class="uia-field-input">
+                  <div class="xpl-select xpl-select--operator" style="width:11.5rem;">
+                    has at least
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="xpl-select" style="width:3.25rem; justify-content:center;">
+                    3
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <span class="uia-field-suffix" style="font-size:0.875rem; color:var(--xpl-color-gray-800);">visits</span>
+                </div>
+              </div>
+
+              <!-- Row 2: timeframe -->
+              <div class="uia-condition-row">
+                <span class="uia-field-label">occurred</span>
+                <div class="uia-field-input">
+                  <div class="xpl-select" style="width:15rem;">
+                    in the last
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="xpl-select" style="width:3.25rem; justify-content:center;">
+                    90
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="xpl-select" style="width:5rem;">
+                    days
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Row 3: auto-injected location (child-local only) -->
+              <div class="uia-condition-row" id="visits-location-row" style="display:none;">
+                <span class="uia-field-label" style="color:var(--xpl-color-teal-700);">at location</span>
+                <div class="uia-field-input">
+                  <span class="location-chip">
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M6 1C4.07 1 2.5 2.57 2.5 4.5c0 2.81 3.5 6.5 3.5 6.5S9.5 7.31 9.5 4.5C9.5 2.57 7.93 1 6 1z" stroke="currentColor" stroke-width="1.3"/><circle cx="6" cy="4.5" r="1" fill="currentColor"/></svg>
+                    Studio A — Mission District
+                  </span>
+                  <span style="font-size:0.75rem; color:var(--xpl-color-gray-500); font-style:italic;">Auto-applied · cannot be removed</span>
+                </div>
+              </div>
+
+            </div>
+            <div class="add-filter-row">
+              <button class="add-filter-btn" id="visits-add-filter">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Add filter
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════
+             CARD: Filled Out a Generic Form
+        ═══════════════════════════════ -->
+        <div id="card-forms" class="condition-builder-card" style="display:none;">
+
+          <div class="condition-card-header">
+            <div class="rule-title">
+              <span class="category-name">Forms</span>
+              <span class="vertical-divider"></span>
+              <span>Filled Out a Generic Form</span>
+            </div>
+
+            <!-- HQ scope indicator -->
+            <span id="forms-scope-hq" class="scope-indicator" style="display:none;">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><ellipse cx="8" cy="8" rx="2.6" ry="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 8h13" stroke="currentColor" stroke-width="1.4"/></svg>
+              Evaluating across all locations
+            </span>
+
+            <!-- Child location label -->
+            <span id="forms-location-child" class="location-label" style="display:none;">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6c0-2.49-2.01-4.5-4.5-4.5z" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="6" r="1.5" fill="currentColor"/></svg>
+              At this location
+            </span>
+
+            <div class="condition-card-actions" id="forms-card-actions">
+              <button class="btn btn--xs btn--ghost">Reset</button>
+              <button class="btn btn--xs btn--ghost" style="color:var(--xpl-color-red-600);">✕</button>
+            </div>
+          </div>
+
+          <!-- Locked banner -->
+          <div class="locked-banner" id="forms-locked-banner" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="7" width="11" height="8" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="11" r="1" fill="currentColor"/></svg>
+            <div>
+              <strong>Set by Momentum Fitness HQ</strong> — This condition cannot be edited.
+              <span class="locked-scope-badge">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.4"/><ellipse cx="6" cy="6" rx="2" ry="5" stroke="currentColor" stroke-width="1.4"/><path d="M1 6h10" stroke="currentColor" stroke-width="1.4"/></svg>
+                Evaluating across all locations
+              </span>
+            </div>
+          </div>
+
+          <!-- HQ-from banner -->
+          <div class="hq-from-banner" id="forms-hq-from-banner" style="display:none;">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5v4M8 10.5v1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span><strong>From Momentum Fitness HQ</strong> — Evaluation scope is set to tenant-wide and cannot be changed. Additional filters allowed.</span>
+          </div>
+
+          <div class="condition-steps-area">
+            <div class="uia-condition-steps">
+
+              <div class="uia-condition-row">
+                <span class="uia-field-label">person</span>
+                <div class="uia-field-input">
+                  <div class="xpl-select xpl-select--operator" style="width:10rem;">
+                    has
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <span class="uia-field-suffix" style="font-size:0.875rem; color:var(--xpl-color-gray-800);">completed a form</span>
+                </div>
+              </div>
+
+              <!-- Optional: specific form -->
+              <div class="uia-condition-row">
+                <span class="uia-field-label">and person completed</span>
+                <div class="uia-field-input">
+                  <div class="xpl-select" style="width:13rem;">
+                    any of the following
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="xpl-select xpl-select--multi">
+                    <span class="xpl-chip">New Member Intake <button class="xpl-chip-remove">×</button></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Auto-injected: account scope (child local forms only) -->
+              <div class="uia-condition-row" id="forms-location-row" style="display:none;">
+                <span class="uia-field-label" style="color:var(--xpl-color-teal-700);">forms from</span>
+                <div class="uia-field-input">
+                  <span class="location-chip">
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M6 1C4.07 1 2.5 2.57 2.5 4.5c0 2.81 3.5 6.5 3.5 6.5S9.5 7.31 9.5 4.5C9.5 2.57 7.93 1 6 1z" stroke="currentColor" stroke-width="1.3"/><circle cx="6" cy="4.5" r="1" fill="currentColor"/></svg>
+                    Studio A — Mission District
+                  </span>
+                  <span style="font-size:0.75rem; color:var(--xpl-color-gray-500); font-style:italic;">Auto-applied · cannot be removed</span>
+                </div>
+              </div>
+
+            </div>
+            <div class="add-filter-row">
+              <button class="add-filter-btn" id="forms-add-filter">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Add filter
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add condition button -->
+        <div class="add-condition-row">
+          <button class="add-condition-btn" id="add-condition-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Add condition
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         JAVASCRIPT
+    ════════════════════════════════════════════ -->
+    <script>
+      // ── State ──
+      let currentAccount = 'hq';       // 'hq' | 'child'
+      let currentCondition = 'membership'; // 'membership' | 'visits' | 'forms'
+      let currentViewMode = 'local';   // 'local' | 'hq-unlocked' | 'hq-locked'
+      let membershipTypeRowVisible = false;
+
+      // ── Main render ──
+      function render() {
+        const isHQ = currentAccount === 'hq';
+        const isChild = !isHQ;
+        const isLocal = currentViewMode === 'local';
+        const isHqUnlocked = currentViewMode === 'hq-unlocked';
+        const isHqLocked = currentViewMode === 'hq-locked';
+
+        // Account context displays
+        document.getElementById('hq-account-display').style.display = isHQ ? 'flex' : 'none';
+        document.getElementById('child-account-display').style.display = isChild ? 'flex' : 'none';
+
+        // Child sub-tabs
+        document.getElementById('child-view-modes').style.display = isChild ? 'flex' : 'none';
+
+        // Callouts
+        const callouts = {
+          'callout-hq': isHQ,
+          'callout-child-local': isChild && isLocal,
+          'callout-child-hq-unlocked': isChild && isHqUnlocked,
+          'callout-child-hq-locked': isChild && isHqLocked,
+        };
+        Object.entries(callouts).forEach(([id, show]) => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = show ? 'block' : 'none';
+        });
+
+        // Which condition card to show in the second card slot
+        // (membership card is always shown; visits and forms alternate as the AND card)
+        const showVisitsCard = currentCondition !== 'forms';
+        const showFormsCard = currentCondition === 'forms';
+        document.getElementById('card-visits').style.display = showVisitsCard ? 'block' : 'none';
+        document.getElementById('card-forms').style.display = showFormsCard ? 'block' : 'none';
+
+        // Segment title tweak by condition
+        const titles = {
+          membership: 'Win-back — No Active Membership',
+          visits: 'Re-engagement — Low Visit Frequency',
+          forms: 'Lead Nurture — Form Submission Follow-up',
+        };
+        document.getElementById('segment-title-text').textContent = titles[currentCondition] || '';
+
+        // Per-card rendering
+        renderCard('membership', isHQ, isChild, isLocal, isHqUnlocked, isHqLocked);
+        renderCard('visits', isHQ, isChild, isLocal, isHqUnlocked, isHqLocked);
+        renderCard('forms', isHQ, isChild, isLocal, isHqUnlocked, isHqLocked);
+
+        // Edit/save/add-condition locked
+        const isAnyLocked = isChild && isHqLocked;
+        document.getElementById('add-condition-btn').classList.toggle('is-locked', isAnyLocked);
+        document.getElementById('save-btn').style.display = isAnyLocked ? 'none' : '';
+        document.getElementById('edit-btn').textContent = isAnyLocked ? 'Read-only' : 'Edit';
+        document.getElementById('edit-btn').disabled = isAnyLocked;
+      }
+
+      function renderCard(name, isHQ, isChild, isLocal, isHqUnlocked, isHqLocked) {
+        const scopeHq = document.getElementById(`${name}-scope-hq`);
+        const locationChild = document.getElementById(`${name}-location-child`);
+        const lockedBanner = document.getElementById(`${name}-locked-banner`);
+        const hqFromBanner = document.getElementById(`${name}-hq-from-banner`);
+        const locationRow = document.getElementById(`${name}-location-row`);
+        const addFilter = document.getElementById(`${name}-add-filter`);
+        const cardActions = document.getElementById(`${name}-card-actions`);
+
+        const show = (el, v) => { if (el) el.style.display = v ? '' : 'none'; };
+        const showFlex = (el, v) => { if (el) el.style.display = v ? 'flex' : 'none'; };
+
+        // Scope indicator in card header
+        showFlex(scopeHq, isHQ);
+        show(locationChild, isChild && isLocal);
+        // No scope indicator when HQ-pushed (the banner replaces it)
+
+        // Banners
+        show(lockedBanner, isChild && isHqLocked);
+        show(hqFromBanner, isChild && isHqUnlocked);
+
+        // Auto-injected location row
+        show(locationRow, isChild && isLocal);
+
+        // Add filter
+        if (addFilter) {
+          addFilter.classList.toggle('is-locked', isChild && isHqLocked);
+        }
+
+        // Card actions (reset/remove)
+        if (cardActions) {
+          const isReadOnly = isChild && isHqLocked;
+          cardActions.style.display = isReadOnly ? 'none' : '';
+        }
+
+        // Disable controls when locked
+        const selects = document.querySelectorAll(`#card-${name === 'membership' ? 'membership' : name === 'visits' ? 'visits' : 'forms'} .xpl-select, #card-${name === 'membership' ? 'membership' : name === 'visits' ? 'visits' : 'forms'} .xpl-input`);
+        const isReadOnly = isChild && isHqLocked;
+        selects.forEach(s => s.classList.toggle('is-disabled', isReadOnly));
+
+        // For HQ-unlocked: disable only the polarity/scope selects (not all)
+        // For simplicity in prototype, keep controls enabled in unlocked state
+      }
+
+      // ── Account switch ──
+      function switchAccount(account) {
+        currentAccount = account;
+        document.querySelectorAll('[data-account]').forEach(btn => {
+          btn.setAttribute('aria-selected', btn.dataset.account === account ? 'true' : 'false');
+        });
+        if (account === 'hq') {
+          currentViewMode = 'local'; // reset
+        }
+        render();
+      }
+
+      // ── Condition switch ──
+      function switchCondition(condition) {
+        currentCondition = condition;
+        document.querySelectorAll('[data-condition]').forEach(btn => {
+          btn.setAttribute('aria-selected', btn.dataset.condition === condition ? 'true' : 'false');
+        });
+        render();
+      }
+
+      // ── View mode switch (child only) ──
+      function switchViewMode(mode) {
+        currentViewMode = mode;
+        document.querySelectorAll('[data-viewmode]').forEach(btn => {
+          btn.setAttribute('aria-selected', btn.dataset.viewmode === mode ? 'true' : 'false');
+        });
+        render();
+      }
+
+      // ── Toggle membership type row (demo of Add filter) ──
+      function toggleMembershipTypeRow() {
+        membershipTypeRowVisible = !membershipTypeRowVisible;
+        const row = document.getElementById('membership-type-row');
+        if (row) row.style.display = membershipTypeRowVisible ? '' : 'none';
+        const btn = document.getElementById('membership-add-filter');
+        if (btn) btn.textContent = membershipTypeRowVisible ? '− Remove filter' : '+ Add filter';
+        if (membershipTypeRowVisible && btn) {
+          btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Remove filter`;
+        } else if (btn) {
+          btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Add filter`;
+        }
+      }
+
+      // Remove chip
+      const chipRemove = document.getElementById('membership-type-chip-remove');
+      if (chipRemove) chipRemove.addEventListener('click', e => { e.stopPropagation(); toggleMembershipTypeRow(); });
+
+      // Initial render
+      render();
+    </script>
+  </body>
+</html>
