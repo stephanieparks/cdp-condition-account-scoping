@@ -943,6 +943,14 @@
         );
       }
 
+      const CHILD_LOCATION = 'Studio A — Mission District';
+      /* Illustrative HQ location chips — three studios in adjacent SF neighborhoods. */
+      const HQ_LOCATION_PLACEHOLDERS = [
+        'Momentum Fitness — Mission District',
+        'Momentum Fitness — Potrero Hill',
+        'Momentum Fitness — Bernal Heights',
+      ];
+
       const TEMPLATES = {
         membership: {
           category: 'Memberships',
@@ -961,9 +969,8 @@
               type: 'multiselect',
               prefix: 'purchase location is',
               inclusion: 'any of the following',
-              tags: [],
+              tags: HQ_LOCATION_PLACEHOLDERS,
             },
-            { id: 'membership_type', name: 'Membership Type', type: 'multiselect', prefix: 'and membership type', inclusion: 'any of the following', tags: ['Unlimited Yoga'] },
             { id: 'contract_length', name: 'Contract length', type: 'count', prefix: 'and contract runs for', suffix: 'months', operator: 'greater than or equal to', count: 12 },
             { id: 'started_at', name: 'When did it start?', type: 'timeframe', prefix: 'and it started', display: 'less than', count: 30, direction: 'ago' },
           ],
@@ -992,7 +999,7 @@
               type: 'multiselect',
               prefix: 'visit location is',
               inclusion: 'any of the following',
-              tags: [],
+              tags: HQ_LOCATION_PLACEHOLDERS,
             },
             { id: 'instructor', name: 'Instructor', type: 'multiselect', prefix: 'instructor is', inclusion: 'any of the following', tags: ['Dana R.'] },
             { id: 'class_session_category', name: 'Class Session Category', type: 'multiselect', prefix: 'class session category is', inclusion: 'any of the following', tags: [] },
@@ -1025,8 +1032,6 @@
       ═════════════════════════════════════════════════════════════════ */
       let account = 'hq'; // 'hq' | 'child'
       let origin = 'local'; // 'local' | 'hq-unlocked' | 'hq-locked'
-
-      const CHILD_LOCATION = 'Studio A — Mission District';
 
       let rules = seedRules();
 
