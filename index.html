@@ -69,7 +69,7 @@
           background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
           border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
       }
-      .xpl-button svg { width: 15px; height: 15px; }
+      .xpl-button svg { width: 15px; height: 15px; flex-shrink: 0; overflow: visible; }
       .xpl-button:hover {
         background-color: var(--xpl-color-secondary-hover-lm);
         box-shadow: 0 1px 2px 0 rgb(0 0 0 / 5%);
@@ -780,7 +780,7 @@
         'chevron-right':
           '<svg viewBox="0 0 16 16" fill="none" width="16" height="16"><path d="M6.5 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         'arrow-rotate-anticlockwise-1':
-          '<svg viewBox="0 0 16 16" fill="none"><path d="M2.5 8a5.5 5.5 0 109.4-3.9M2.5 3v3.2h3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          '<svg viewBox="0 0 16 16" fill="none"><g stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke-width="1.4" d="M2.67 11.63a6.45 6.45 0 1 0-0.63-6.07"/><path fill="none" stroke-width="1.4" d="M1.67 2.94l0.37 2.62 2.62-0.36"/></g></svg>',
         trash:
           '<svg viewBox="0 0 16 16" fill="none"><path d="M2.8 4.5h10.4M6.2 4.5V2.8h3.6v1.7M4.2 4.5l.6 8.2c0 .3.3.5.6.5h5.2c.3 0 .6-.2.6-.5l.6-8.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         plus:
@@ -937,8 +937,8 @@
         }
         return (
           `${injected} ` +
-          (tpl.category === 'Memberships'
-            ? `Membership location path TBD — has_membership is still a trait, not an aggregate (PRD §9 Q2).`
+          (tpl.activityLocationProperty
+            ? `Activity matched on ${tpl.activityLocationProperty}.`
             : `Forms scope by XG account, not MT location (PRD §9 Q2).`)
         );
       }
@@ -947,36 +947,58 @@
         membership: {
           category: 'Memberships',
           name: 'Has a Membership - CDP',
-          /* PRD §9 Q2: membership aggregate location path TBD — has_membership is
-             still a contact trait today. When the aggregate ships, expect a
-             location or purchase_location object with external_account_id. */
-          activityLocationProperty: null,
-          locationLabel: 'and purchase location',
+          locationFilterId: 'purchase_location',
+          activityLocationProperty: 'aggregate.properties.purchase_location.external_account_id',
+          locationLabel: 'and purchase location is',
           steps: [
             { id: 'has_membership', type: 'existence', prefix: 'person', suffix: 'a membership', value: 'has' },
             { id: 'membership_status', type: 'select', prefix: 'and status is', suffix: '', value: 'Active' },
           ],
           optional: [
-            { id: 'membership_type', name: 'Which membership types?', type: 'multiselect', prefix: 'and membership type', inclusion: 'any of the following', tags: ['Unlimited Yoga'] },
+            {
+              id: 'purchase_location',
+              name: 'Purchase Location',
+              type: 'multiselect',
+              prefix: 'purchase location is',
+              inclusion: 'any of the following',
+              tags: [],
+            },
+            { id: 'membership_type', name: 'Membership Type', type: 'multiselect', prefix: 'and membership type', inclusion: 'any of the following', tags: ['Unlimited Yoga'] },
             { id: 'contract_length', name: 'Contract length', type: 'count', prefix: 'and contract runs for', suffix: 'months', operator: 'greater than or equal to', count: 12 },
             { id: 'started_at', name: 'When did it start?', type: 'timeframe', prefix: 'and it started', display: 'less than', count: 30, direction: 'ago' },
           ],
         },
         visits: {
           category: 'Visits',
-          name: 'Milestone Visits - CDP',
-          /* PRD §9 Q2: verified against bbna-209 sample payloads. MT aggregates
-             carry location: { id, external_account_id, name }; filter on
-             external_account_id (e.g. mt-cousteau-101). */
+          name: 'Number of Visits - CDP Aggregate',
+          /* Steps transcribed from production UIA template (bbna-209, external_condition_version_id 6cf9e5a9). */
+          locationFilterId: 'visit_location',
           activityLocationProperty: 'aggregate.properties.location.external_account_id',
-          locationLabel: 'and at location',
+          locationLabel: 'and visit location is',
           steps: [
-            { id: 'class_check_in_count', type: 'count', prefix: 'person completed', suffix: 'milestone visits', operator: 'greater than or equal to', count: 3 },
-            { id: 'occurred_at', type: 'timeframe', prefix: 'and it occurred', display: 'less than', count: 90, direction: 'ago' },
+            { id: 'visit_count', type: 'count', prefix: 'person has', suffix: 'visits', operator: 'greater than', count: 1 },
           ],
           optional: [
-            { id: 'class_type', name: 'Which class types?', type: 'multiselect', prefix: 'and class type', inclusion: 'any of the following', tags: ['Vinyasa 60'] },
-            { id: 'instructor', name: 'Which instructors?', type: 'multiselect', prefix: 'and instructor', inclusion: 'any of the following', tags: ['Dana R.'] },
+            { id: 'timestamp', name: 'Timeframe', type: 'timeframe', prefix: 'occurred', display: 'within the last', count: 30, direction: 'ago' },
+            { id: 'membership_type', name: 'Membership Type', type: 'multiselect', prefix: 'membership type is', inclusion: 'any of the following', tags: [] },
+            { id: 'membership_category', name: 'Membership Category', type: 'multiselect', prefix: 'membership category is', inclusion: 'any of the following', tags: [] },
+            { id: 'membership_contract', name: 'Membership Contract', type: 'multiselect', prefix: 'membership contract is', inclusion: 'any of the following', tags: [] },
+            { id: 'credit_type', name: 'Credit Type', type: 'multiselect', prefix: 'credit type is', inclusion: 'any of the following', tags: [] },
+            { id: 'credit_category', name: 'Credit Category', type: 'multiselect', prefix: 'credit category is', inclusion: 'any of the following', tags: [] },
+            { id: 'credit_package', name: 'Credit Package', type: 'multiselect', prefix: 'credit package is', inclusion: 'any of the following', tags: [] },
+            {
+              id: 'visit_location',
+              name: 'Visit Location',
+              type: 'multiselect',
+              prefix: 'visit location is',
+              inclusion: 'any of the following',
+              tags: [],
+            },
+            { id: 'instructor', name: 'Instructor', type: 'multiselect', prefix: 'instructor is', inclusion: 'any of the following', tags: ['Dana R.'] },
+            { id: 'class_session_category', name: 'Class Session Category', type: 'multiselect', prefix: 'class session category is', inclusion: 'any of the following', tags: [] },
+            { id: 'class_session_type', name: 'Class Session Type', type: 'multiselect', prefix: 'class session type is', inclusion: 'any of the following', tags: ['Vinyasa 60'] },
+            { id: 'classroom', name: 'Classroom', type: 'multiselect', prefix: 'classroom is', inclusion: 'any of the following', tags: [] },
+            { id: 'class_time', name: 'Class Time', type: 'multiselect', prefix: 'class time is', inclusion: 'any of the following', tags: [] },
           ],
         },
         forms: {
@@ -1022,6 +1044,15 @@
       const isLocationScoped = () => account === 'child' && origin === 'local';
       const isTenantWide = () => account === 'hq' || origin !== 'local';
       const hasDraft = () => rules.some((r) => !r.template);
+      /* HQ optional location filters — when added, the tenant-wide badge is removed (PRD §6.1 A). */
+      const hasLocationFilter = (rule, tpl) =>
+        Boolean(tpl?.locationFilterId && rule.addedSteps.includes(tpl.locationFilterId));
+      const optionalStepsForRule = (rule, tpl) =>
+        tpl.optional.filter(
+          (s) =>
+            !rule.addedSteps.includes(s.id) &&
+            !(isLocationScoped() && s.id === tpl.locationFilterId)
+        );
 
       /* ═════════════════════════════════════════════════════════════════
          FIELD RENDERERS — one per FieldTypes entry in XHB
@@ -1087,11 +1118,17 @@
       /* ═════════════════════════════════════════════════════════════════
          CARD RENDERERS
       ═════════════════════════════════════════════════════════════════ */
-      function renderScopeBadge() {
+      function renderScopeBadge(rule, tpl) {
         if (isLocationScoped()) {
           return `<span class="xpl-badge scope-badge scope-badge--location">${icon('map-pin', 12)} At this location</span>`;
         }
-        return `<span class="xpl-badge scope-badge scope-badge--tenant">${icon('globe', 12)} Evaluating across all locations</span>`;
+        if (hasLocationFilter(rule, tpl)) {
+          return '';
+        }
+        if (account === 'hq' || origin !== 'local') {
+          return `<span class="xpl-badge scope-badge scope-badge--tenant">${icon('globe', 12)} Evaluating across all locations</span>`;
+        }
+        return '';
       }
 
       function renderOriginNotice() {
@@ -1187,7 +1224,7 @@
 
         const header =
           `<div class="condition-card-header"><span class="rule-title">${title}</span>` +
-          (tpl ? renderScopeBadge() : '') +
+          (tpl ? renderScopeBadge(rule, tpl) : '') +
           actions +
           `</div>`;
 
@@ -1246,7 +1283,7 @@
         }
 
         /* Add filter row — the last .uia-condition-row, label "and" */
-        const remaining = tpl.optional.filter((s) => !rule.addedSteps.includes(s.id));
+        const remaining = optionalStepsForRule(rule, tpl);
         if (remaining.length > 0 && !readOnly) {
           rows +=
             `<div class="uia-condition-row">` +

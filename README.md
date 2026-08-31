@@ -118,6 +118,7 @@ invented in the component library.
 | **HQ scope indicator** | `xpl-badge` with a globe icon in `.condition-card-header`, between `.rule-title` and `.condition-card-actions`: "Evaluating across all locations" |
 | **Child scope indicator** | same slot, teal `xpl-badge` with a location pin: "At this location" |
 | **Injected location scope** | an ordinary `.uia-condition-row` — a disabled multiselect step whose chip is teal and non-removable, whose tree connectors are teal instead of `gray-500`, and whose `.uia-field-controls` slot carries a disabled lock button where an optional step would carry a trash button. The lock's tooltip names the leaf that is actually injected today and flags what is still unresolved (see Open questions). |
+| **HQ optional location filter** | at HQ, **Purchase Location** (membership) and **Visit Location** (Number of Visits) appear in the Add filter dropdown as optional steps — the same filters production UIA exposes. Adding one removes the tenant-wide globe badge (PRD §6.1 A). At child accounts the equivalent filter is injected and locked instead. |
 | **HQ-pushed, unlocked** | `ReadOnlyExternalCriteria` panel inside the card, yellow variant, `Scope locked` badge. Steps stay editable and Add filter still works; no location step is injected. |
 | **HQ-pushed, locked** | the same panel in its published indigo form with the `Read only` badge; every select and input disabled, Reset/Remove hidden, Add filter row omitted, Save and Add New Condition disabled. |
 
