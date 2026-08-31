@@ -136,26 +136,9 @@ invented in the component library.
 
 ### Open questions — status after the 2026-08-31 verification pass
 
-The placeholders that used to sit here were checked against the CDP repos. Two are resolved, one
-had a false premise, and the pass surfaced a new blocking question. Full evidence and citations are
-in PRD §9.
+Full evidence and citations are in PRD §9.
 
-- **Q1 — resolved.** The filter is injected at audience-create time by
-  `createConditionWithAccountFilter()` in `xcs-cdp-audience-api`, from an `account_filter` the MA API
-  sets when the account has a parent. This is already the shipped pattern for HQ/child audiences, so
-  the prototype's "injected, non-removable step" model matches how the platform really behaves.
-- **Q2 — premise was wrong.** The three properties this prototype used to name
-  (`detail.traits.purchase_location_id`, `detail.traits.visit_location_id`,
-  `detail.traits.internal_account_id`) **do not exist**, and neither does any
-  `aggregate.properties.*location*` path. The lock tooltip now names the leaf that is genuinely
-  injected — `detail.associated_accounts.internal_account_ids in [account id]` — and says plainly
-  that activity-level location filtering is unavailable.
-- **Q3 — resolved.** `marianatek:{accountId}:linkedLocations` is real: a Redis SET of numeric MT
-  location IDs, mirrored in a `linked_locations` table keyed `(account_id, location_id)`. Multiple
-  locations per account are supported and `IN`/OR is the established semantic. There is no reliable
-  "primary" location, so the single-chip rendering here is the common case rather than the rule — a
-  multi-location account would show several chips in the same list.
-- **Q8 — new, blocking.** CDP can scope *which contacts are eligible*, not *which activity counts*.
-  The injected row in this prototype is drawn as a location match on the activity, which the engine
-  cannot do today. Until Q8 is settled, read that row as depicting intent rather than current
-  behaviour — and note that "At this location" overclaims if scoping stays contact-level.
+- **Q1 — resolved.** Filter injected at audience-create via `createConditionWithAccountFilter` + `account_filter`.
+- **Q2 — partially resolved.** MT aggregates carry a `location` object (`id`, `external_account_id`, `name`). Verified paths: visits → `aggregate.properties.location.external_account_id`; purchases → `aggregate.properties.purchase_location.external_account_id` (same shape, sibling property). Filter values are `external_account_id` strings like `mt-cousteau-101`, mapped from `linkedLocations` numeric IDs via `mt-{tenant}-{id}`. Memberships and forms still TBD.
+- **Q3 — resolved.** `linkedLocations` is a Redis SET; multi-location supported; use `IN`/OR across all linked IDs mapped to `external_account_id` strings.
+- **Q8 — revised, not blocking for visits/purchases.** Two scoping axes: contact (`associated_accounts`) and activity (aggregate location leaf). Activity scoping is feasible for aggregate conditions now that the location object is confirmed. Still open: whether to inject one leaf or both, and how to handle memberships (trait today) and forms (account-scoped events).
