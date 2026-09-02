@@ -594,8 +594,8 @@
       .scope-badge svg { flex-shrink: 0; }
       .scope-badge--tenant,
       .scope-badge--location { background-color: var(--xpl-color-purple-100); color: var(--xpl-color-purple-800); }
-      /* Apollo's yellow and grey badge variants, by token: yellow for a
-         constraint the marketer still works around, grey for an inert card. */
+      /* Apollo's yellow badge variant — retained in CSS for reference; hq-unlocked
+         uses a visible locked location row instead of a second header badge. */
       .scope-badge--hq-scope {
         background-color: var(--xpl-background-badge-yellow);
         color: var(--xpl-text-badge-yellow);
@@ -757,7 +757,8 @@
       <span class="harness-label" style="color: var(--xpl-color-gray-500)">Condition origin</span>
       <button class="view-chip" aria-selected="true" data-viewmode="local">Authored here</button>
       <button class="view-chip" aria-selected="false" data-viewmode="hq-unlocked">Pushed from HQ (unlocked)</button>
-      <button class="view-chip" aria-selected="false" data-viewmode="hq-locked">Pushed from HQ (locked)</button>
+      <button class="view-chip" aria-selected="false" data-viewmode="hq-locked">Pushed from HQ (locked, all)</button>
+      <button class="view-chip" aria-selected="false" data-viewmode="hq-locked-scoped">Pushed from HQ (locked, scoped)</button>
     </div>
 
     <div class="state-callout">
@@ -920,36 +921,44 @@
         operator: 'in',
       };
 
-      /* Tooltip on the injected row's lock. Names the leaf that is actually
-         injected today, and is explicit that the activity-level location match
-         this row depicts is still unresolved. No double quotes — this is
-         interpolated into a title attribute. */
-      function scopeTooltip(tpl) {
-        const injected =
-          `Scoped to this account — contact filter injected as ` +
-          `${SCOPE_INJECTION.property} ${SCOPE_INJECTION.operator} [account id].`;
-        if (tpl.activityLocationProperty) {
-          return (
-            `${injected} Activity matched on ${tpl.activityLocationProperty} ` +
-            `in [mt-tenant-locationId, …] — the location.external_account_id ` +
-            `from the MT aggregate payload.`
-          );
-        }
-        return (
-          `${injected} ` +
-          (tpl.activityLocationProperty
-            ? `Activity matched on ${tpl.activityLocationProperty}.`
-            : `Forms scope by XG account, not MT location (PRD §9 Q2).`)
-        );
+      /* Tooltip on a locked location row's lock control. */
+      function lockRowTooltip(context) {
+        if (context === 'account') return 'Locked by your account';
+        return 'Locked by HQ';
       }
 
       const CHILD_LOCATION = 'Studio A — Mission District';
-      /* Illustrative HQ location chips — three studios in adjacent SF neighborhoods. */
-      const HQ_LOCATION_PLACEHOLDERS = [
+      /* Illustrative HQ location chips — three studios HQ scoped to specifically. */
+      const HQ_SCOPED_LOCATIONS = [
         'Momentum Fitness — Mission District',
         'Momentum Fitness — Potrero Hill',
         'Momentum Fitness — Bernal Heights',
       ];
+      /* Twelve-brand footprint for "includes all locations" locked rows. */
+      const HQ_ALL_LOCATIONS = [
+        ...HQ_SCOPED_LOCATIONS,
+        'Momentum Fitness — Marina',
+        'Momentum Fitness — Noe Valley',
+        'Momentum Fitness — Castro',
+        'Momentum Fitness — Pacific Heights',
+        'Momentum Fitness — SOMA',
+        'Momentum Fitness — Hayes Valley',
+        'Momentum Fitness — Richmond',
+        'Momentum Fitness — Sunset',
+        'Momentum Fitness — Oakland',
+      ];
+      /* Legacy alias — HQ optional location filter placeholders at HQ. */
+      const HQ_LOCATION_PLACEHOLDERS = HQ_SCOPED_LOCATIONS;
+
+      /* Collapse long locked location lists to the first three chips plus +N. */
+      function lockedLocationTags(locations, maxVisible = 3) {
+        if (locations.length <= maxVisible) {
+          return locations.map((label) => ({ label, locked: true }));
+        }
+        const tags = locations.slice(0, maxVisible).map((label) => ({ label, locked: true }));
+        tags.push({ label: `+${locations.length - maxVisible}`, locked: true });
+        return tags;
+      }
 
       const TEMPLATES = {
         membership: {
@@ -1031,7 +1040,7 @@
          STATE — mirrors XcsHorizontalBuilder.vue `appliedRules`
       ═════════════════════════════════════════════════════════════════ */
       let account = 'hq'; // 'hq' | 'child'
-      let origin = 'local'; // 'local' | 'hq-unlocked' | 'hq-locked'
+      let origin = 'local'; // 'local' | 'hq-unlocked' | 'hq-locked' | 'hq-locked-scoped'
 
       let rules = seedRules();
 
@@ -1044,20 +1053,57 @@
       }
 
       /* Locked conditions are read-only; unlocked HQ pushes stay editable. */
-      const isReadOnly = () => account === 'child' && origin === 'hq-locked';
+      const isReadOnly = () => account === 'child' && (origin === 'hq-locked' || origin === 'hq-locked-scoped');
       /* Location scope is injected only for conditions authored at the child. */
       const isLocationScoped = () => account === 'child' && origin === 'local';
-      const isTenantWide = () => account === 'hq' || origin !== 'local';
+      /* HQ-pushed conditions that surface a locked location row in the rule. */
+      const isHqPushed = () => account === 'child' && ['hq-unlocked', 'hq-locked', 'hq-locked-scoped'].includes(origin);
+      const isHqLockedAll = () => origin === 'hq-locked';
+      const isHqLockedScoped = () => origin === 'hq-locked-scoped';
       const hasDraft = () => rules.some((r) => !r.template);
-      /* HQ optional location filters — when added, the tenant-wide badge is removed (PRD §6.1 A). */
+      /* Scope badge hides once a marketer adds their own location filter. */
       const hasLocationFilter = (rule, tpl) =>
         Boolean(tpl?.locationFilterId && rule.addedSteps.includes(tpl.locationFilterId));
+
+      function hqPushLocations() {
+        return isHqLockedScoped() ? HQ_SCOPED_LOCATIONS : HQ_ALL_LOCATIONS;
+      }
+
+      function renderLockedLocationRow(tpl, { tags, lockTitle, disabled = true }) {
+        if (!tpl?.locationFilterId) return '';
+        return renderRow({
+          extraCls: 'uia-condition-row--injected',
+          label: tpl.locationLabel,
+          field: renderField(
+            { type: 'multiselect', inclusion: 'any of the following', tags, locked: true },
+            disabled
+          ),
+          controls: apolloButton({
+            iconName: 'lock',
+            variant: 'subtle',
+            size: 'xs',
+            iconOnly: true,
+            disabled: true,
+            attrs: `title="${lockTitle}"`,
+          }),
+        });
+      }
+
+      function optionalStepForRender(stepId, step, tpl) {
+        if (origin === 'hq-unlocked' && stepId === tpl.locationFilterId) {
+          return { ...step, tags: [CHILD_LOCATION] };
+        }
+        return step;
+      }
+
       const optionalStepsForRule = (rule, tpl) =>
-        tpl.optional.filter(
-          (s) =>
-            !rule.addedSteps.includes(s.id) &&
-            !(isLocationScoped() && s.id === tpl.locationFilterId)
-        );
+        tpl.optional.filter((s) => {
+          if (!rule.addedSteps.includes(s.id)) {
+            if (isLocationScoped() && s.id === tpl.locationFilterId) return false;
+            return true;
+          }
+          return false;
+        });
 
       /* ═════════════════════════════════════════════════════════════════
          FIELD RENDERERS — one per FieldTypes entry in XHB
@@ -1097,7 +1143,9 @@
               apolloSelect({ value: step.inclusion, cls: 'inclusion-options-select', disabled: disabled || step.locked }) +
               `<div class="multiselect-field">` +
               apolloSelect({
-                tags: (step.tags || []).map((label) => ({ label, locked: step.locked })),
+                tags: (step.tags || []).map((tag) =>
+                  typeof tag === 'string' ? { label: tag, locked: step.locked } : tag
+                ),
                 placeholder: 'Select item(s)',
                 selectIcon: 'chevron-right',
                 disabled: disabled || step.locked,
@@ -1130,30 +1178,29 @@
         if (hasLocationFilter(rule, tpl)) {
           return '';
         }
-        if (account === 'hq' || origin !== 'local') {
-          return `<span class="xpl-badge scope-badge scope-badge--tenant">${icon('globe', 12)} Includes all locations</span>`;
+        if (isHqLockedScoped()) {
+          const count = HQ_SCOPED_LOCATIONS.length;
+          return (
+            `<span class="xpl-badge scope-badge scope-badge--tenant" ` +
+            `title="${HQ_SCOPED_LOCATIONS.join(', ')}">` +
+            `${icon('map-pin', 12)} ${count} locations</span>`
+          );
+        }
+        if (account === 'hq' || isHqPushed()) {
+          return `<span class="xpl-badge scope-badge scope-badge--tenant">${icon('map-pin', 12)} Includes all locations</span>`;
         }
         return '';
       }
 
-      /* Governance badge for HQ-pushed conditions. It sits immediately after the
-         scope badge so ownership and scope read as one run of card metadata, and
-         .condition-card-actions stays reserved for things the marketer can do.
-         The full sentence lives in the title so the badge itself stays short. */
+      /* Governance badge — only on fully locked HQ pushes. Unlocked pushes rely
+         on the visible locked location row instead of a second header badge. */
       function renderGovernanceBadge() {
         if (account !== 'child') return '';
-        if (origin === 'hq-locked') {
+        if (isReadOnly()) {
           return (
             `<span class="xpl-badge scope-badge scope-badge--hq-readonly" ` +
             `title="Set by Momentum Fitness HQ. Applied automatically and not editable in this builder.">` +
-            `${icon('lock', 12)} Locked by HQ · read only</span>`
-          );
-        }
-        if (origin === 'hq-unlocked') {
-          return (
-            `<span class="xpl-badge scope-badge scope-badge--hq-scope" ` +
-            `title="Set by Momentum Fitness HQ. Evaluation stays brand-wide and cannot be narrowed to this location.">` +
-            `${icon('lock', 12)} Scope locked by HQ · filters can be added</span>`
+            `${icon('lock', 12)} Locked by HQ</span>`
           );
         }
         return '';
@@ -1238,24 +1285,22 @@
           .map((step) => renderRow({ label: step.prefix, field: renderField(step, readOnly) + suffix(step) }))
           .join('');
 
-        /* Auto-injected location scope — fixed immediately after required steps
-           so Add filter rows append below it instead of pushing it down. */
+        /* Auto-injected / HQ-locked location scope — fixed immediately after
+           required steps so Add filter rows append below it. */
         if (isLocationScoped()) {
-          rows += renderRow({
-            extraCls: 'uia-condition-row--injected',
-            label: tpl.locationLabel,
-            field: renderField(
-              { type: 'multiselect', inclusion: 'any of the following', tags: [CHILD_LOCATION], locked: true },
-              false
-            ),
-            controls: apolloButton({
-              iconName: 'lock',
-              variant: 'subtle',
-              size: 'xs',
-              iconOnly: true,
-              disabled: true,
-              attrs: `title="${scopeTooltip(tpl)}"`,
-            }),
+          rows += renderLockedLocationRow(
+            tpl,
+            {
+              tags: lockedLocationTags([CHILD_LOCATION]),
+              lockTitle: lockRowTooltip('account'),
+              disabled: false,
+            }
+          );
+        } else if (isHqPushed()) {
+          rows += renderLockedLocationRow(tpl, {
+            tags: lockedLocationTags(hqPushLocations()),
+            lockTitle: lockRowTooltip('hq'),
+            disabled: isReadOnly(),
           });
         }
 
@@ -1263,7 +1308,7 @@
            in .uia-field-controls, exactly as in ConditionCard.vue */
         rows += rule.addedSteps
           .map((stepId) => {
-            const step = tpl.optional.find((s) => s.id === stepId);
+            const step = optionalStepForRender(stepId, tpl.optional.find((s) => s.id === stepId), tpl);
             const trash = apolloButton({ iconName: 'trash', variant: 'subtle', size: 'xs', state: 'warning', iconOnly: true });
             return renderRow({
               label: `and ${step.prefix.replace(/^and /, '')}`,
@@ -1371,13 +1416,15 @@
           : '· 1 connected location (MT loc_2847) · location-scoped CDP access';
 
         const callouts = {
-          hq: '<strong>HQ:</strong> every condition card carries the globe badge "Includes all locations", so the marketer knows the segment pulls from the full brand\'s CDP data. The badge is removed once they add a location filter of their own.',
+          hq: '<strong>HQ:</strong> every condition card carries the purple map-pin badge "Includes all locations". The badge is removed once the marketer adds a location filter of their own.',
           local:
-            '<strong>Child account, authored here:</strong> a location step is injected into the rule automatically. It renders as a normal condition row with teal connectors and a disabled lock in the controls slot where an optional step would show a trash button. Other filters can still be added; the scope itself cannot be widened.',
+            '<strong>Child account, authored here:</strong> a location step is injected after the required steps — teal connectors, lock icon with "Locked by your account" tooltip. Other filters append below; the scope row never moves.',
           'hq-unlocked':
-            '<strong>Child account, pushed from HQ (unlocked):</strong> a yellow "Scope locked by HQ · filters can be added" badge sits beside the "Includes all locations" badge in the card header. Steps stay editable and Add filter still works, but no location step is injected — the condition remains brand-wide.',
+            '<strong>Child account, pushed from HQ (unlocked):</strong> the locked HQ location row is visible (all locations, first three chips + "+9"). No second header badge. The child can add filters below; Purchase/Visit Location adds only this studio and removes the "Includes all locations" badge.',
           'hq-locked':
-            '<strong>Child account, pushed from HQ (locked):</strong> a grey "Locked by HQ · read only" badge sits beside the "Includes all locations" badge, and the card is inert — every xpl-select and xpl-input disabled, Reset/Remove hidden, Add filter row omitted, Save and Add New Condition disabled.',
+            '<strong>Child account, pushed from HQ (locked, all):</strong> grey "Locked by HQ" badge plus "Includes all locations". The locked location row shows all twelve locations (three chips + "+9"). The card is fully read-only.',
+          'hq-locked-scoped':
+            '<strong>Child account, pushed from HQ (locked, scoped):</strong> grey "Locked by HQ" badge plus "3 locations". The locked location row shows the three HQ-selected studios. The card is fully read-only.',
         };
         document.getElementById('state-callout').innerHTML = isHQ ? callouts.hq : callouts[origin];
       }
@@ -1515,7 +1562,7 @@
       function applyHash() {
         const [a, o] = location.hash.replace(/^#/, '').split('/');
         if (a === 'hq' || a === 'child') account = a;
-        if (['local', 'hq-unlocked', 'hq-locked'].includes(o)) origin = o;
+        if (['local', 'hq-unlocked', 'hq-locked', 'hq-locked-scoped'].includes(o)) origin = o;
         if (account === 'hq') origin = 'local';
       }
 

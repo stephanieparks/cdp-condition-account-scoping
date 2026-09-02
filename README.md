@@ -26,8 +26,9 @@ States are deep-linkable via the URL hash:
 |------|-------|
 | `#hq/local` | HQ — tenant-wide evaluation |
 | `#child/local` | Child account, condition authored locally |
-| `#child/hq-unlocked` | Child account, condition pushed from HQ, still editable |
-| `#child/hq-locked` | Child account, condition pushed from HQ and locked |
+| `#child/hq-unlocked` | Child account, HQ push unlocked — visible locked location row, no second badge |
+| `#child/hq-locked` | Child account, HQ push locked (all locations) |
+| `#child/hq-locked-scoped` | Child account, HQ push locked (HQ-selected locations) |
 
 ## XHB fidelity
 
@@ -115,32 +116,24 @@ invented in the component library.
 
 | Affordance | Implementation |
 |------------|----------------|
-| **HQ scope indicator** | `xpl-badge` with a globe icon in `.condition-card-header`, between `.rule-title` and `.condition-card-actions`: "Includes all locations" |
-| **Child scope indicator** | same slot, purple `xpl-badge` with a location pin: "Only this location" |
-| **Injected location scope** | an ordinary `.uia-condition-row` — a disabled multiselect step whose chip is teal and non-removable, whose tree connectors are teal instead of `gray-500`, and whose `.uia-field-controls` slot carries a disabled lock button where an optional step would carry a trash button. The lock's tooltip names the leaf that is actually injected today and flags what is still unresolved (see Open questions). |
-| **HQ optional location filter** | at HQ, **Purchase Location** (membership) and **Visit Location** (Number of Visits) appear in the Add filter dropdown as optional steps — the same filters production UIA exposes. Adding one removes the tenant-wide globe badge (PRD §6.1 A). At child accounts the equivalent filter is injected and locked instead. |
-| **HQ-pushed, unlocked** | second `xpl-badge` in the header, immediately after the scope badge: Apollo's yellow variant with a lock icon, "Scope locked by HQ · filters can be added". Steps stay editable and Add filter still works; no location step is injected. |
-| **HQ-pushed, locked** | same slot, Apollo's grey variant with a lock icon, "Locked by HQ · read only"; every select and input disabled, Reset/Remove hidden, Add filter row omitted, Save and Add New Condition disabled. |
+| **HQ scope indicator** | purple `xpl-badge` with map-pin icon: **Includes all locations** (removed once marketer adds their own location filter) |
+| **Child scope indicator** | same slot, purple map-pin badge: **Only this location** |
+| **HQ scoped push indicator** | purple map-pin badge: **N locations** (tooltip lists HQ's picks) |
+| **Injected location scope (authored here)** | locked `.uia-condition-row` after required steps — teal connectors, child studio chip, lock tooltip **Locked by your account** |
+| **HQ-pushed location scope (visible)** | same row pattern after required steps — locked chips (first 3 + **+N** when brand-wide), lock tooltip **Locked by HQ** |
+| **HQ optional location filter** | at HQ, **Purchase Location** / **Visit Location** in Add filter; at child **authored here**, equivalent row is injected and locked |
+| **HQ-pushed, unlocked** | no second header badge — locked HQ location row communicates scope; child can add filters below; location filter adds **only this studio** and removes scope badge |
+| **HQ-pushed, locked** | grey **Locked by HQ** badge; visible locked location row; card fully read-only |
 
 ### Rationale
 
-- HQ uses a globe rather than a location pin to signal brand-wide reach; the child uses a pin.
-- The injected location step is styled as a step rather than as a banner because it *is* part of the
-  rule — a marketer reading the card top to bottom should read the location constraint in sequence
-  with the rest of the condition, not as chrome around it.
-- The lock replaces the trash in the controls slot rather than sitting next to it, so the row has
-  exactly one affordance in exactly the place the marketer already looks for one.
-- HQ-pushed conditions are labelled with a header badge rather than an in-card banner. Ownership is
-  metadata about the card, not a step in the rule, so it belongs on the same line as the scope badge;
-  a banner pushed the rule itself down the card and read as an alert the marketer had to clear.
-- The governance badge sits after the scope badge rather than at the top right, so that
-  `.condition-card-actions` stays reserved for actions and the locked and unlocked states share one
-  anatomy — only the badge colour, wording and card interactivity differ between them.
-- Grey for locked, yellow for unlocked, following Apollo's badge semantics: grey reads as inert
-  (nothing here responds), yellow as a live constraint the marketer still works around.
-- The badge text carries the consequence ("read only", "filters can be added") rather than only the
-  cause, since the consequence is what changes what the marketer does next. Attribution to the
-  specific HQ and the longer explanation move to the badge's tooltip.
+- Map-pin icon on every scope badge so **Only this location**, **Includes all locations**, and **N locations** read as the same control family.
+- The injected / HQ-locked location step is styled as a step rather than as a banner because it *is* part of the rule — a marketer reading the card top to bottom should read the location constraint in sequence with the rest of the condition.
+- The lock replaces the trash in the controls slot rather than sitting next to it, so the row has exactly one affordance in exactly the place the marketer already looks for one.
+- HQ-pushed **unlocked** conditions do not carry a second header badge — the locked location row makes scope visible without a yellow alert competing for attention (design review 2026-09-02).
+- HQ-pushed **locked** conditions carry a short grey **Locked by HQ** badge; hover/tooltip carries the rest.
+- Locked location rows stay fixed after required steps; filters the marketer adds always append below.
+- Long HQ location lists collapse to three chips plus **+N** so pills stay scannable.
 - The scope badge is removed at HQ once a marketer adds their own location filter, so the badge never
   contradicts the rule (interaction described in the PRD, not prototyped).
 
