@@ -62,7 +62,7 @@ otherwise unchanged.
 | `ConditionFields/*.vue` | select `13.75rem`; count operator `12.5rem`; timeframe display `13rem`, unit and direction `9rem`, value `5rem`; multiselect inclusion `13.75rem` with a `flex: 1` tag select using `chevron-right` |
 | `ConditionSelector.vue` | empty-state category select, condition select revealed only after a category is chosen, secondary "Search All Conditions" |
 | `ConfrimPopover.vue` | `20rem` confirm panel, message + optional "Don't show me this again" + `Cancel` / action buttons at `sm`, `warning` state for destructive actions |
-| `ReadOnlyExternalCriteria.vue` | indigo read-only panel with lock icon, heading, subtitle and uppercase `Read only` badge |
+| `ReadOnlyExternalCriteria.vue` | indigo read-only panel with lock icon, heading, subtitle and uppercase `Read only` badge — transcribed, but no longer mounted: the HQ-pushed states use header badges instead |
 
 ### XHB behaviours that are live
 
@@ -119,8 +119,8 @@ invented in the component library.
 | **Child scope indicator** | same slot, teal `xpl-badge` with a location pin: "At this location" |
 | **Injected location scope** | an ordinary `.uia-condition-row` — a disabled multiselect step whose chip is teal and non-removable, whose tree connectors are teal instead of `gray-500`, and whose `.uia-field-controls` slot carries a disabled lock button where an optional step would carry a trash button. The lock's tooltip names the leaf that is actually injected today and flags what is still unresolved (see Open questions). |
 | **HQ optional location filter** | at HQ, **Purchase Location** (membership) and **Visit Location** (Number of Visits) appear in the Add filter dropdown as optional steps — the same filters production UIA exposes. Adding one removes the tenant-wide globe badge (PRD §6.1 A). At child accounts the equivalent filter is injected and locked instead. |
-| **HQ-pushed, unlocked** | `ReadOnlyExternalCriteria` panel inside the card, yellow variant, `Scope locked` badge. Steps stay editable and Add filter still works; no location step is injected. |
-| **HQ-pushed, locked** | the same panel in its published indigo form with the `Read only` badge; every select and input disabled, Reset/Remove hidden, Add filter row omitted, Save and Add New Condition disabled. |
+| **HQ-pushed, unlocked** | second `xpl-badge` in the header, immediately after the scope badge: Apollo's yellow variant with a lock icon, "Scope locked by HQ · filters can be added". Steps stay editable and Add filter still works; no location step is injected. |
+| **HQ-pushed, locked** | same slot, Apollo's grey variant with a lock icon, "Locked by HQ · read only"; every select and input disabled, Reset/Remove hidden, Add filter row omitted, Save and Add New Condition disabled. |
 
 ### Rationale
 
@@ -130,8 +130,17 @@ invented in the component library.
   with the rest of the condition, not as chrome around it.
 - The lock replaces the trash in the controls slot rather than sitting next to it, so the row has
   exactly one affordance in exactly the place the marketer already looks for one.
-- Locked HQ conditions reuse the read-only external-criteria treatment instead of a bespoke banner,
-  because XHB already teaches that visual language for "someone else owns this".
+- HQ-pushed conditions are labelled with a header badge rather than an in-card banner. Ownership is
+  metadata about the card, not a step in the rule, so it belongs on the same line as the scope badge;
+  a banner pushed the rule itself down the card and read as an alert the marketer had to clear.
+- The governance badge sits after the scope badge rather than at the top right, so that
+  `.condition-card-actions` stays reserved for actions and the locked and unlocked states share one
+  anatomy — only the badge colour, wording and card interactivity differ between them.
+- Grey for locked, yellow for unlocked, following Apollo's badge semantics: grey reads as inert
+  (nothing here responds), yellow as a live constraint the marketer still works around.
+- The badge text carries the consequence ("read only", "filters can be added") rather than only the
+  cause, since the consequence is what changes what the marketer does next. Attribution to the
+  specific HQ and the longer explanation move to the badge's tooltip.
 - The scope badge is removed at HQ once a marketer adds their own location filter, so the badge never
   contradicts the rule (interaction described in the PRD, not prototyped).
 
