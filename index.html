@@ -592,8 +592,8 @@
         flex-shrink: 0;
       }
       .scope-badge svg { flex-shrink: 0; }
-      .scope-badge--tenant { background-color: var(--xpl-color-purple-100); color: var(--xpl-color-purple-800); }
-      .scope-badge--location { background-color: var(--xpl-color-teal-100); color: var(--xpl-color-teal-900); }
+      .scope-badge--tenant,
+      .scope-badge--location { background-color: var(--xpl-color-purple-100); color: var(--xpl-color-purple-800); }
       /* Apollo's yellow and grey badge variants, by token: yellow for a
          constraint the marketer still works around, grey for an inert card. */
       .scope-badge--hq-scope {
@@ -1125,13 +1125,13 @@
       ═════════════════════════════════════════════════════════════════ */
       function renderScopeBadge(rule, tpl) {
         if (isLocationScoped()) {
-          return `<span class="xpl-badge scope-badge scope-badge--location">${icon('map-pin', 12)} At this location</span>`;
+          return `<span class="xpl-badge scope-badge scope-badge--location">${icon('map-pin', 12)} Only this location</span>`;
         }
         if (hasLocationFilter(rule, tpl)) {
           return '';
         }
         if (account === 'hq' || origin !== 'local') {
-          return `<span class="xpl-badge scope-badge scope-badge--tenant">${icon('globe', 12)} Evaluating across all locations</span>`;
+          return `<span class="xpl-badge scope-badge scope-badge--tenant">${icon('globe', 12)} Includes all locations</span>`;
         }
         return '';
       }
@@ -1238,6 +1238,27 @@
           .map((step) => renderRow({ label: step.prefix, field: renderField(step, readOnly) + suffix(step) }))
           .join('');
 
+        /* Auto-injected location scope — fixed immediately after required steps
+           so Add filter rows append below it instead of pushing it down. */
+        if (isLocationScoped()) {
+          rows += renderRow({
+            extraCls: 'uia-condition-row--injected',
+            label: tpl.locationLabel,
+            field: renderField(
+              { type: 'multiselect', inclusion: 'any of the following', tags: [CHILD_LOCATION], locked: true },
+              false
+            ),
+            controls: apolloButton({
+              iconName: 'lock',
+              variant: 'subtle',
+              size: 'xs',
+              iconOnly: true,
+              disabled: true,
+              attrs: `title="${scopeTooltip(tpl)}"`,
+            }),
+          });
+        }
+
         /* Optional steps the marketer added via Add filter — trash button lives
            in .uia-field-controls, exactly as in ConditionCard.vue */
         rows += rule.addedSteps
@@ -1259,29 +1280,6 @@
             });
           })
           .join('');
-
-        /* Auto-injected location scope. Rendered as an ordinary condition row so
-           it reads as part of the same rule; the controls slot carries a disabled
-           lock button where an optional step would show a trash button. */
-        if (isLocationScoped()) {
-          rows += renderRow({
-            extraCls: 'uia-condition-row--injected',
-            label: tpl.locationLabel,
-            field: renderField(
-              { type: 'multiselect', inclusion: 'any of the following', tags: [CHILD_LOCATION], locked: true },
-              false
-            ),
-            caption: 'Set by your account · cannot be removed',
-            controls: apolloButton({
-              iconName: 'lock',
-              variant: 'subtle',
-              size: 'xs',
-              iconOnly: true,
-              disabled: true,
-              attrs: `title="${scopeTooltip(tpl)}"`,
-            }),
-          });
-        }
 
         /* Add filter row — the last .uia-condition-row, label "and" */
         const remaining = optionalStepsForRule(rule, tpl);
@@ -1364,8 +1362,8 @@
           ? `${icon('office-building', 12)}&nbsp;HQ`
           : `${icon('map-pin', 12)}&nbsp;Studio`;
         badge.style.gap = '0.25rem';
-        badge.style.backgroundColor = isHQ ? 'var(--xpl-color-purple-100)' : 'var(--xpl-color-teal-100)';
-        badge.style.color = isHQ ? 'var(--xpl-color-purple-800)' : 'var(--xpl-color-teal-900)';
+        badge.style.backgroundColor = 'var(--xpl-color-purple-100)';
+        badge.style.color = 'var(--xpl-color-purple-800)';
 
         document.getElementById('account-name').textContent = isHQ ? 'Momentum Fitness' : CHILD_LOCATION;
         document.getElementById('account-meta').textContent = isHQ
@@ -1373,13 +1371,13 @@
           : '· 1 connected location (MT loc_2847) · location-scoped CDP access';
 
         const callouts = {
-          hq: '<strong>HQ:</strong> every condition card carries the globe badge "Evaluating across all locations", so the marketer knows the segment pulls from the full brand\'s CDP data. The badge is removed once they add a location filter of their own.',
+          hq: '<strong>HQ:</strong> every condition card carries the globe badge "Includes all locations", so the marketer knows the segment pulls from the full brand\'s CDP data. The badge is removed once they add a location filter of their own.',
           local:
             '<strong>Child account, authored here:</strong> a location step is injected into the rule automatically. It renders as a normal condition row with teal connectors and a disabled lock in the controls slot where an optional step would show a trash button. Other filters can still be added; the scope itself cannot be widened.',
           'hq-unlocked':
-            '<strong>Child account, pushed from HQ (unlocked):</strong> a yellow "Scope locked by HQ · filters can be added" badge sits beside the globe badge in the card header. Steps stay editable and Add filter still works, but no location step is injected — the condition remains brand-wide.',
+            '<strong>Child account, pushed from HQ (unlocked):</strong> a yellow "Scope locked by HQ · filters can be added" badge sits beside the "Includes all locations" badge in the card header. Steps stay editable and Add filter still works, but no location step is injected — the condition remains brand-wide.',
           'hq-locked':
-            '<strong>Child account, pushed from HQ (locked):</strong> a grey "Locked by HQ · read only" badge sits beside the globe badge, and the card is inert — every xpl-select and xpl-input disabled, Reset/Remove hidden, Add filter row omitted, Save and Add New Condition disabled.',
+            '<strong>Child account, pushed from HQ (locked):</strong> a grey "Locked by HQ · read only" badge sits beside the "Includes all locations" badge, and the card is inert — every xpl-select and xpl-input disabled, Reset/Remove hidden, Add filter row omitted, Save and Add New Condition disabled.',
         };
         document.getElementById('state-callout').innerHTML = isHQ ? callouts.hq : callouts[origin];
       }
