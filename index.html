@@ -205,6 +205,19 @@
         transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
       }
       .xpl-tag-container:hover .xpl-tag { background-color: #ebe5ff; }
+      /* Disabled / locked tags — Apollo uses gray-400 stroke and gray-600 text,
+         not secondary-lm (purple) or a custom accent on non-interactive chips. */
+      .xpl-input--disabled .xpl-tag-container:hover .xpl-tag,
+      .xpl-tag-container--locked:hover .xpl-tag { background-color: transparent; }
+      .xpl-input--disabled .xpl-tag,
+      .xpl-tag-container--locked .xpl-tag {
+        border-color: var(--xpl-color-gray-400);
+        color: var(--xpl-color-gray-600);
+        cursor: default;
+      }
+      .xpl-input--disabled .xpl-input-wrapper:focus-within {
+        border-color: var(--xpl-color-gray-400);
+      }
       .xpl-tag__close {
         right: 18px;
         top: -1px;
@@ -218,12 +231,9 @@
       }
       /* Injected, non-removable scope chip: no close affordance to offer. */
       .xpl-tag-container--locked .xpl-tag {
-        border-color: var(--xpl-color-teal-400);
         padding-right: 10px;
         margin-right: 0;
-        cursor: default;
       }
-      .xpl-tag-container--locked:hover .xpl-tag { background-color: transparent; }
 
       /* ── xpl-divider ───────────────────────────────────────────────── */
       .xpl-divider {
