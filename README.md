@@ -120,7 +120,7 @@ invented in the component library.
 | **Child scope indicator** | same slot, purple map-pin badge: **Only this location** |
 | **HQ scoped push indicator** | purple map-pin badge: **N locations** (tooltip lists HQ's picks) |
 | **Injected location scope (authored here)** | locked `.uia-condition-row` after required steps — teal connectors, child studio chip, lock tooltip **Locked by your account** |
-| **HQ-pushed location scope (visible)** | same row pattern after required steps — locked chips (first 3 + **+N** when brand-wide), lock tooltip **Locked by HQ** |
+| **HQ-pushed location scope (visible)** | same row pattern after required steps — locked chips (two visible in this width) then Apollo **+ N more** overflow text when the list exceeds what fits; lock tooltip **Locked by HQ** |
 | **HQ optional location filter** | at HQ, **Purchase Location** / **Visit Location** in Add filter; at child **authored here**, equivalent row is injected and locked |
 | **HQ-pushed, unlocked** | no second header badge — locked HQ location row communicates scope; child can add filters below; location filter adds **only this studio** and removes scope badge |
 | **HQ-pushed, locked** | grey **Locked by HQ** badge; visible locked location row; card fully read-only |
@@ -133,7 +133,7 @@ invented in the component library.
 - HQ-pushed **unlocked** conditions do not carry a second header badge — the locked location row makes scope visible without a yellow alert competing for attention (design review 2026-09-02).
 - HQ-pushed **locked** conditions carry a short grey **Locked by HQ** badge; hover/tooltip carries the rest.
 - Locked location rows stay fixed after required steps; filters the marketer adds always append below.
-- Long HQ location lists collapse to three chips plus **+N** so pills stay scannable.
+- Long HQ location lists show two chips plus **+ N more** inline text (Apollo `xpl-select` truncate), not an extra chip pill.
 - The scope badge is removed at HQ once a marketer adds their own location filter, so the badge never
   contradicts the rule (interaction described in the PRD, not prototyped).
 

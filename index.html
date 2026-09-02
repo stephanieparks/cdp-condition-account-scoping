@@ -170,6 +170,14 @@
         color: #6a6d7d;
       }
       .xpl-select-value--active { pointer-events: auto; }
+      .xpl-select-value.has-value { color: var(--xpl-color-gray-900); }
+      /* xpl-select truncate — plain text after visible tags, not a chip */
+      .xpl-select-value__overflow {
+        color: var(--xpl-color-gray-600);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        white-space: nowrap;
+      }
       .xpl-select__chevron-down {
         color: var(--xpl-color-gray-1000);
         position: absolute;
@@ -822,14 +830,23 @@
          xpl-select → .xpl-select > .xpl-input > .xpl-input-wrapper >
                       button.xpl-select__trigger > .xpl-select-value
       ═════════════════════════════════════════════════════════════════ */
-      function apolloSelect({ value, placeholder, width, cls = '', disabled = false, selectIcon = 'chevron-down', tags = null }) {
+      function apolloSelect({
+        value,
+        placeholder,
+        width,
+        cls = '',
+        disabled = false,
+        selectIcon = 'chevron-down',
+        tags = null,
+        tagsOverflow = 0,
+      }) {
         const hostCls = ['xpl-select', disabled ? 'xpl-select--disabled' : '', cls].filter(Boolean).join(' ');
         const innerCls = ['xpl-input', disabled ? 'xpl-input--disabled' : ''].filter(Boolean).join(' ');
         const hasValue = tags ? tags.length > 0 : Boolean(value);
         const valueCls = ['xpl-select-value', tags && tags.length ? 'xpl-select-value--active' : '', hasValue ? 'has-value' : '']
           .filter(Boolean)
           .join(' ');
-        const body = tags
+        const tagMarkup = tags
           ? tags
               .map(
                 (tag) =>
@@ -841,7 +858,10 @@
                   `</span>`
               )
               .join('')
-          : value || placeholder || '';
+          : '';
+        const overflowMarkup =
+          tagsOverflow > 0 ? `<span class="xpl-select-value__overflow">+ ${tagsOverflow} more</span>` : '';
+        const body = tags ? tagMarkup + overflowMarkup : value || placeholder || '';
         return (
           `<div class="${hostCls}"${width ? ` style="width:${width}"` : ''}>` +
           `<div class="${innerCls}"><div class="xpl-input-wrapper">` +
@@ -960,14 +980,14 @@
       /* Legacy alias — HQ optional location filter placeholders at HQ. */
       const HQ_LOCATION_PLACEHOLDERS = HQ_SCOPED_LOCATIONS;
 
-      /* Collapse long locked location lists to the first three chips plus +N. */
-      function lockedLocationTags(locations, maxVisible = 3) {
-        if (locations.length <= maxVisible) {
-          return locations.map((label) => ({ label, locked: true }));
-        }
+      /* How many location chips fit in the multiselect trigger before Apollo's
+         "+ N more" overflow label — matches xpl-select truncate behaviour. */
+      const TAG_OVERFLOW_VISIBLE = 2;
+
+      /* Visible tags plus an overflow count for "+ N more" (not an extra chip). */
+      function visibleLocationTags(locations, maxVisible = TAG_OVERFLOW_VISIBLE) {
         const tags = locations.slice(0, maxVisible).map((label) => ({ label, locked: true }));
-        tags.push({ label: `+${locations.length - maxVisible}`, locked: true });
-        return tags;
+        return { tags, overflowCount: Math.max(0, locations.length - maxVisible) };
       }
 
       const TEMPLATES = {
@@ -1079,13 +1099,20 @@
         return isHqLockedScoped() ? HQ_SCOPED_LOCATIONS : HQ_ALL_LOCATIONS;
       }
 
-      function renderLockedLocationRow(tpl, { tags, lockTitle, disabled = true }) {
+      function renderLockedLocationRow(tpl, { locations, lockTitle, disabled = true }) {
         if (!tpl?.locationFilterId) return '';
+        const { tags, overflowCount } = visibleLocationTags(locations);
         return renderRow({
           extraCls: 'uia-condition-row--injected',
           label: tpl.locationLabel,
           field: renderField(
-            { type: 'multiselect', inclusion: 'any of the following', tags, locked: true },
+            {
+              type: 'multiselect',
+              inclusion: 'any of the following',
+              tags,
+              tagsOverflow: overflowCount,
+              locked: true,
+            },
             disabled
           ),
           controls: apolloButton({
@@ -1156,6 +1183,7 @@
                 tags: (step.tags || []).map((tag) =>
                   typeof tag === 'string' ? { label: tag, locked: step.locked } : tag
                 ),
+                tagsOverflow: step.tagsOverflow || 0,
                 placeholder: 'Select item(s)',
                 selectIcon: 'chevron-right',
                 disabled: disabled || step.locked,
@@ -1298,17 +1326,14 @@
         /* Auto-injected / HQ-locked location scope — fixed immediately after
            required steps so Add filter rows append below it. */
         if (isLocationScoped()) {
-          rows += renderLockedLocationRow(
-            tpl,
-            {
-              tags: lockedLocationTags([CHILD_LOCATION]),
-              lockTitle: lockRowTooltip('account'),
-              disabled: false,
-            }
-          );
+          rows += renderLockedLocationRow(tpl, {
+            locations: [CHILD_LOCATION],
+            lockTitle: lockRowTooltip('account'),
+            disabled: false,
+          });
         } else if (isHqPushed()) {
           rows += renderLockedLocationRow(tpl, {
-            tags: lockedLocationTags(hqPushLocations()),
+            locations: hqPushLocations(),
             lockTitle: lockRowTooltip('hq'),
             disabled: isReadOnly(),
           });
@@ -1430,11 +1455,11 @@
           local:
             '<strong>Child account, authored here:</strong> a location step is injected after the required steps — teal connectors, lock icon with "Locked by your account" tooltip. Other filters append below; the scope row never moves.',
           'hq-unlocked':
-            '<strong>Child account, pushed from HQ (unlocked):</strong> the locked HQ location row is visible (all locations, first three chips + "+9"). No second header badge. The child can add filters below; Purchase/Visit Location adds only this studio and removes the "Includes all locations" badge.',
+            '<strong>Child account, pushed from HQ (unlocked):</strong> the locked HQ location row is visible (two chips + "+ N more" when the list overflows). No second header badge. The child can add filters below; Purchase/Visit Location adds only this studio and removes the "Includes all locations" badge.',
           'hq-locked':
-            '<strong>Child account, pushed from HQ (locked, all):</strong> grey "Locked by HQ" badge plus "Includes all locations". The locked location row shows all twelve locations (three chips + "+9"). The card is fully read-only.',
+            '<strong>Child account, pushed from HQ (locked, all):</strong> grey "Locked by HQ" badge plus "Includes all locations". The locked location row shows two chips + "+ 10 more" for the full brand footprint. The card is fully read-only.',
           'hq-locked-scoped':
-            '<strong>Child account, pushed from HQ (locked, scoped):</strong> grey "Locked by HQ" badge plus "3 locations". The locked location row shows the three HQ-selected studios. The card is fully read-only.',
+            '<strong>Child account, pushed from HQ (locked, scoped):</strong> grey "Locked by HQ" badge plus "3 locations". The locked location row shows two chips + "+ 1 more". The card is fully read-only.',
         };
         document.getElementById('state-callout').innerHTML = isHQ ? callouts.hq : callouts[origin];
       }
